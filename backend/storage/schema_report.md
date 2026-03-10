@@ -1,0 +1,272 @@
+# Schema Optimization Report
+
+- ---------------------------------
+- 🗑️ Table 'analysis_service_fee' missing soft delete column (deleted_at).
+- 📄 Table 'analysis_service_fee' - nullable text column 'notes' may slow down queries.
+- ---------------------------------
+- 🎭 Table 'announcements' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'announcements' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'announcements' - 'organization_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'announcements' - nullable text column 'body' may slow down queries.
+- ⚙️ Table 'announcements' - consider indexing 'is_active' for query filtering.
+- ⚙️ Table 'announcements' - consider indexing 'type' for query filtering.
+- ⚡ Table 'announcements' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🗑️ Table 'areas' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'chats' missing soft delete column (deleted_at).
+- ⚡ Table 'chats' - consider composite index on (user_id, created_at).
+- ---------------------------------
+- 📄 Table 'chronic_diseases' - nullable text column 'notes' may slow down queries.
+- ---------------------------------
+- 🗑️ Table 'cities' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'clinics' missing soft delete column (deleted_at).
+- 🚀 Table 'clinics' - consider indexing 'email' for fast lookups.
+- 📄 Table 'clinics' - nullable text column 'description' may slow down queries.
+- ⚙️ Table 'clinics' - consider indexing 'status' for query filtering.
+- ---------------------------------
+- 🗑️ Table 'doctors' missing soft delete column (deleted_at).
+- ⚡ Table 'doctors' - consider composite index on (user_id, created_at).
+- ---------------------------------
+- 🗑️ Table 'domains' missing soft delete column (deleted_at).
+- ---------------------------------
+- ⚙️ Table 'drugs' - consider indexing 'type' for query filtering.
+- ⚡ Table 'drugs' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🎭 Table 'events' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- 🔗 Table 'events' - 'organization_id' looks like foreign key but has no FK constraint.
+- ---------------------------------
+- 🕒 Table 'failed_jobs' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'failed_jobs' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'glasses_distances' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'governorates' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'lab_services' missing soft delete column (deleted_at).
+- 🎭 Table 'lab_services' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'lab_services' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'lab_services' - 'organization_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'lab_services' - nullable text column 'notes' may slow down queries.
+- ---------------------------------
+- 🗑️ Table 'lab_service_categories' missing soft delete column (deleted_at).
+- ⚙️ Table 'lab_service_categories' - consider indexing 'is_active' for query filtering.
+- 🎭 Table 'lab_service_categories' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'lab_service_categories' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'lab_service_categories' - 'organization_id' looks like foreign key but has no FK constraint.
+- ---------------------------------
+- 🗑️ Table 'lab_service_options' missing soft delete column (deleted_at).
+- 🎭 Table 'lab_service_options' - consider composite index on ('module_id', 'module_type') for morphable relation.
+- ℹ️ Table 'lab_service_options' - 'module_id' and 'module_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'lab_service_options' - 'module_id' looks like foreign key but has no FK constraint.
+- ---------------------------------
+- 🗑️ Table 'media' missing soft delete column (deleted_at).
+- 🎭 Table 'media' - consider composite index on ('model_id', 'model_type') for morphable relation.
+- 🔗 Table 'media' - 'model_id' looks like foreign key but has no FK constraint.
+- ⚙️ Table 'media' - consider indexing 'mime_type' for query filtering.
+- ---------------------------------
+- 🎭 Table 'medical_analysis' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'medical_analysis' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'medical_analysis' - 'organization_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'medical_analysis' - nullable text column 'report' may slow down queries.
+- ---------------------------------
+- 🗑️ Table 'medical_laboratories' missing soft delete column (deleted_at).
+- 🚀 Table 'medical_laboratories' - consider indexing 'email' for fast lookups.
+- 📄 Table 'medical_laboratories' - nullable text column 'description' may slow down queries.
+- ⚙️ Table 'medical_laboratories' - consider indexing 'status' for query filtering.
+- ---------------------------------
+- 🧩 Table 'medicines' - add index on 'drugbank_id' (likely foreign key).
+- 🔗 Table 'medicines' - 'drugbank_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'medicines' - nullable text column 'brand_name' may slow down queries.
+- ⚙️ Table 'medicines' - consider indexing 'type' for query filtering.
+- 📄 Table 'medicines' - nullable text column 'description' may slow down queries.
+- 📄 Table 'medicines' - nullable text column 'side_effect' may slow down queries.
+- ⚡ Table 'medicines' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🗑️ Table 'messages' missing soft delete column (deleted_at).
+- 🧩 Table 'messages' - add index on 'sender_id' (likely foreign key).
+- 🔗 Table 'messages' - 'sender_id' looks like foreign key but has no FK constraint.
+- 🎭 Table 'messages' - consider composite index on ('sender_id', 'sender_type') for morphable relation.
+- ⚙️ Table 'messages' - consider indexing 'sender_type' for query filtering.
+- ---------------------------------
+- 🕒 Table 'migrations' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'migrations' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🕒 Table 'model_has_permissions' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'model_has_permissions' missing soft delete column (deleted_at).
+- 🔗 Table 'model_has_permissions' - 'model_id' looks like foreign key but has no FK constraint.
+- ❗ Table 'model_has_permissions' - column 'model_id' has multiple indexes (model_has_permissions_model_id_model_type_index, PRIMARY).
+- ❗ Table 'model_has_permissions' - column 'model_type' has multiple indexes (model_has_permissions_model_id_model_type_index, PRIMARY).
+- ❗ Table 'model_has_permissions' - column 'permission_id' has multiple indexes (PRIMARY, IDX_6B22422AFED90CCA).
+- ---------------------------------
+- 🕒 Table 'model_has_roles' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'model_has_roles' missing soft delete column (deleted_at).
+- 🔗 Table 'model_has_roles' - 'model_id' looks like foreign key but has no FK constraint.
+- ❗ Table 'model_has_roles' - column 'role_id' has multiple indexes (PRIMARY, IDX_747E57EAD60322AC).
+- ❗ Table 'model_has_roles' - column 'model_id' has multiple indexes (PRIMARY, model_has_roles_model_id_model_type_index).
+- ❗ Table 'model_has_roles' - column 'model_type' has multiple indexes (PRIMARY, model_has_roles_model_id_model_type_index).
+- ---------------------------------
+- 🗑️ Table 'module_services' missing soft delete column (deleted_at).
+- 🎭 Table 'module_services' - consider composite index on ('module_id', 'module_type') for morphable relation.
+- 🔗 Table 'module_services' - 'module_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'module_services' - nullable text column 'notes' may slow down queries.
+- ---------------------------------
+- 🗑️ Table 'notifications' missing soft delete column (deleted_at).
+- ⚙️ Table 'notifications' - consider indexing 'type' for query filtering.
+- 🎭 Table 'notifications' - consider composite index on ('notifiable_id', 'notifiable_type') for morphable relation.
+- 🔗 Table 'notifications' - 'notifiable_id' looks like foreign key but has no FK constraint.
+- ⚡ Table 'notifications' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🗑️ Table 'number_of_reservations' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🧩 Table 'online_reservations' - add index on 'meeting_id' (likely foreign key).
+- 🔗 Table 'online_reservations' - 'meeting_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'online_reservations' - nullable text column 'first_diagnosis' may slow down queries.
+- 📄 Table 'online_reservations' - nullable text column 'final_diagnosis' may slow down queries.
+- ⚙️ Table 'online_reservations' - consider indexing 'type' for query filtering.
+- ⚡ Table 'online_reservations' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🗑️ Table 'organization_activation_tokens' missing soft delete column (deleted_at).
+- 🎭 Table 'organization_activation_tokens' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- 🔗 Table 'organization_activation_tokens' - 'organization_id' looks like foreign key but has no FK constraint.
+- ⚡ Table 'organization_activation_tokens' - consider composite index on (user_id, created_at).
+- ---------------------------------
+- ⚠️ Table 'password_resets' has no primary key.
+- 🕒 Table 'password_resets' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'password_resets' missing soft delete column (deleted_at).
+- ---------------------------------
+- ⚙️ Table 'patients' - consider indexing 'marital_status' for query filtering.
+- ❗ Table 'patients' - column 'patient_code' has multiple indexes (patients_name_patient_code_phone_index, patients_patient_code_unique).
+- ❗ Table 'patients' - column 'phone' has multiple indexes (patients_name_patient_code_phone_index, patients_phone_unique).
+- ---------------------------------
+- 🎭 Table 'patient_organization' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'patient_organization' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'patient_organization' - 'organization_id' looks like foreign key but has no FK constraint.
+- ---------------------------------
+- 🎭 Table 'patient_reviews' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'patient_reviews' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'patient_reviews' - 'organization_id' looks like foreign key but has no FK constraint.
+- ⚙️ Table 'patient_reviews' - consider indexing 'is_active' for query filtering.
+- ❗ Table 'patient_reviews' - column 'doctor_id' has multiple indexes (patient_reviews_doctor_id_foreign, unique_patient_organization_review, unique_patient_doctor_review).
+- ❗ Table 'patient_reviews' - column 'patient_id' has multiple indexes (unique_patient_organization_review, unique_patient_doctor_review, IDX_3413BEE46B899279).
+- ❗ Table 'patient_reviews' - column 'organization_id' has multiple indexes (unique_patient_organization_review, patient_reviews_organization_type_organization_id_index).
+- ❗ Table 'patient_reviews' - column 'organization_type' has multiple indexes (unique_patient_organization_review, patient_reviews_organization_type_organization_id_index).
+- 📉 Table 'patient_reviews' - has 7 indexes; too many may slow writes.
+- ---------------------------------
+- 🗑️ Table 'permissions' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'personal_access_tokens' missing soft delete column (deleted_at).
+- 🎭 Table 'personal_access_tokens' - consider composite index on ('tokenable_id', 'tokenable_type') for morphable relation.
+- 🔗 Table 'personal_access_tokens' - 'tokenable_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'personal_access_tokens' - nullable text column 'abilities' may slow down queries.
+- ---------------------------------
+- 🗑️ Table 'prescriptions' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'radiology_centers' missing soft delete column (deleted_at).
+- 🚀 Table 'radiology_centers' - consider indexing 'email' for fast lookups.
+- 📄 Table 'radiology_centers' - nullable text column 'description' may slow down queries.
+- ⚙️ Table 'radiology_centers' - consider indexing 'status' for query filtering.
+- ---------------------------------
+- 🎭 Table 'rays' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'rays' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'rays' - 'organization_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'rays' - nullable text column 'report' may slow down queries.
+- ---------------------------------
+- 📄 Table 'reservations' - nullable text column 'first_diagnosis' may slow down queries.
+- 📄 Table 'reservations' - nullable text column 'final_diagnosis' may slow down queries.
+- ❗ Table 'reservations' - column 'doctor_id' has multiple indexes (reservations_doctor_id_foreign, reservations_patient_id_doctor_id_clinic_id_index).
+- ❗ Table 'reservations' - column 'clinic_id' has multiple indexes (reservations_clinic_id_foreign, reservations_patient_id_doctor_id_clinic_id_index).
+- ❗ Table 'reservations' - column 'patient_id' has multiple indexes (reservations_patient_id_doctor_id_clinic_id_index, IDX_4DA2396B899279).
+- 📉 Table 'reservations' - has 7 indexes; too many may slow writes.
+- ---------------------------------
+- 🗑️ Table 'reservation_service_fee' missing soft delete column (deleted_at).
+- 📄 Table 'reservation_service_fee' - nullable text column 'notes' may slow down queries.
+- ---------------------------------
+- 🗑️ Table 'reservation_slots' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'roles' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🕒 Table 'role_has_permissions' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'role_has_permissions' missing soft delete column (deleted_at).
+- ❗ Table 'role_has_permissions' - column 'permission_id' has multiple indexes (PRIMARY, IDX_8BDE50C2FED90CCA).
+- ❗ Table 'role_has_permissions' - column 'role_id' has multiple indexes (PRIMARY, role_has_permissions_role_id_foreign).
+- ---------------------------------
+- 🗑️ Table 'services' missing soft delete column (deleted_at).
+- 🎭 Table 'services' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'services' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'services' - 'organization_id' looks like foreign key but has no FK constraint.
+- ⚙️ Table 'services' - consider indexing 'type' for query filtering.
+- 📄 Table 'services' - nullable text column 'notes' may slow down queries.
+- ⚡ Table 'services' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🕒 Table 'sessions' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'sessions' missing soft delete column (deleted_at).
+- 🔗 Table 'sessions' - 'user_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'sessions' - nullable text column 'user_agent' may slow down queries.
+- ---------------------------------
+- 🗑️ Table 'settings' missing soft delete column (deleted_at).
+- 🎭 Table 'settings' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'settings' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'settings' - 'organization_id' looks like foreign key but has no FK constraint.
+- ⚙️ Table 'settings' - consider indexing 'type' for query filtering.
+- ⚡ Table 'settings' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🗑️ Table 'specialties' missing soft delete column (deleted_at).
+- 📄 Table 'specialties' - nullable text column 'description' may slow down queries.
+- ---------------------------------
+- 🗑️ Table 'subscriptions' missing soft delete column (deleted_at).
+- 🔗 Table 'subscriptions' - 'user_id' looks like foreign key but has no FK constraint.
+- 🔗 Table 'subscriptions' - 'stripe_id' looks like foreign key but has no FK constraint.
+- ⚡ Table 'subscriptions' - consider composite index on (user_id, created_at).
+- ---------------------------------
+- 🗑️ Table 'subscription_items' missing soft delete column (deleted_at).
+- 🔗 Table 'subscription_items' - 'subscription_id' looks like foreign key but has no FK constraint.
+- 🔗 Table 'subscription_items' - 'stripe_id' looks like foreign key but has no FK constraint.
+- ---------------------------------
+- 🕒 Table 'telescope_entries' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'telescope_entries' missing soft delete column (deleted_at).
+- 🔗 Table 'telescope_entries' - 'batch_id' looks like foreign key but has no FK constraint.
+- ⚡ Table 'telescope_entries' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🕒 Table 'telescope_entries_tags' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'telescope_entries_tags' missing soft delete column (deleted_at).
+- ❗ Table 'telescope_entries_tags' - column 'tag' has multiple indexes (telescope_entries_tags_tag_index, PRIMARY).
+- ❗ Table 'telescope_entries_tags' - column 'entry_uuid' has multiple indexes (PRIMARY, IDX_30F14662755D28B5).
+- ---------------------------------
+- 🕒 Table 'telescope_monitoring' missing timestamps (created_at / updated_at).
+- 🗑️ Table 'telescope_monitoring' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🧩 Table 'temp_data' - add index on 'batch_id' (likely foreign key).
+- 🔗 Table 'temp_data' - 'batch_id' looks like foreign key but has no FK constraint.
+- ⚙️ Table 'temp_data' - consider indexing 'type' for query filtering.
+- ⚡ Table 'temp_data' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🗑️ Table 'tenants' missing soft delete column (deleted_at).
+- ---------------------------------
+- 🗑️ Table 'types' missing soft delete column (deleted_at).
+- 📄 Table 'types' - nullable text column 'description' may slow down queries.
+- ⚙️ Table 'types' - consider indexing 'type' for query filtering.
+- 🎭 Table 'types' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'types' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'types' - 'organization_id' looks like foreign key but has no FK constraint.
+- ⚡ Table 'types' - consider composite index on (type, created_at).
+- ---------------------------------
+- 🎭 Table 'users' - consider composite index on ('organization_id', 'organization_type') for morphable relation.
+- ℹ️ Table 'users' - 'organization_id' and 'organization_type' are nullable morphs, ensure consistent null handling.
+- 🔗 Table 'users' - 'organization_id' looks like foreign key but has no FK constraint.
+- 📄 Table 'users' - nullable text column 'two_factor_secret' may slow down queries.
+- 📄 Table 'users' - nullable text column 'two_factor_recovery_codes' may slow down queries.
+- 🧩 Table 'users' - add index on 'current_team_id' (likely foreign key).
+- 🔗 Table 'users' - 'current_team_id' looks like foreign key but has no FK constraint.
+- 📏 Table 'users' - 'profile_photo_path' VARCHAR(2048) too large, use TEXT or reduce length.
+- 🔗 Table 'users' - 'stripe_id' looks like foreign key but has no FK constraint.
+- ⚙️ Table 'users' - consider indexing 'pm_type' for query filtering.
+- ⚙️ Table 'users' - consider indexing 'active_status' for query filtering.
+- ❗ Table 'users' - column 'organization_type' has multiple indexes (users_organization_type_organization_id_index, users_organization_id_organization_type_email_index).
+- ❗ Table 'users' - column 'organization_id' has multiple indexes (users_organization_type_organization_id_index, users_organization_id_organization_type_email_index).
+- ❗ Table 'users' - column 'email' has multiple indexes (users_organization_id_organization_type_email_index, users_email_unique).
+- ---------------------------------
+- 🗑️ Table 'user_doctors' missing soft delete column (deleted_at).
+- ⚡ Table 'user_doctors' - consider composite index on (user_id, created_at).
+- ---------------------------------

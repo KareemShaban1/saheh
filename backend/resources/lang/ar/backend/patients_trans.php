@@ -1,0 +1,118 @@
+<?php
+
+
+return [
+
+          // classes
+          'pull'=>'pull-left',
+
+
+          ''=>'',
+          'Patients'=>'المرضى',
+          'All_Patients'=>'كل المرضى',
+          'Id'=>'Id',
+          'Patient_Name'=>'أسم المريض',
+          'Number_of_Reservations'=>'عدد الحجوزات',
+          'Add_Reservation'=>'أضافة حجز',
+          'Control'=>'التحكم',
+          'Show_Patient_Card'=>'عرض كارت المريض',
+
+          'Height'=>'الطول',
+          'Weight'=>'الوزن',
+          'Whatsapp_Number'=>'رقم الواتساب',
+
+
+
+          // add patient
+          'Add_Patient'=>'أضافة مريض',
+          'Patient_Name'=>'أسم المريض',
+          'Age'=>'السن',
+          'Address'=>'العنوان',
+          'Email'=>'البريد الإلكترونى',
+          'Password'=>'كلمة المرور',
+          'Phone'=>'رقم الهاتف',
+          'Patient_Gender'=>'نوع المريض',
+          'Choose'=>'أختار من القائمة',
+          'Male'=>'ذكر',
+          'Female'=>'أنثى',
+          'Blood_Group'=>'فصيلة الدم',
+          'Add'=>'أضافة',
+
+          // edit patient
+          'Edit_Patient'=>'تعديل المريض',
+          'Edit'=>'تعديل',
+
+          // patinet profile
+          'Patient_Profile'=>'ملف المريض',
+          'Patient_Information'=>'معلومات المريض',
+          'Reservations'=>'الحجوزات',
+          'Add_Online_Reservation'=>'أضافة حجز أونلاين ',
+          'Reservation_Count'=>'عدد الكشوفات',
+          'Reservation_Number'=>'كشف رقم',
+          'Number_of_Reservation'=>'رقم الكشف',
+          'First_Diagnosis'=>'التشخيص المبدئى',
+          'Final_Diagnosis'=>'التشخيض النهائى',
+          'Reservation_Type'=>'نوع الحجز',
+          'Check'=>'كشف',
+          'Recheck'=>'أعادة كشف',
+          'Consultation'=>'أستشارة',
+          'Payment'=>'حالة الدفع',
+          'Paid'=>'تم الدفع',
+          'Not_Paid'=>'لم يتم الدفع',
+          'Reservation_Date'=>'تاريخ الكشف',
+
+          // trash patients
+          'Deleted_Patients'=>'المرضى المحذوفين',
+          'Restore'=>'إعادة',
+          'Delete_Forever'=>'حذف نهائى',
+
+          'Patient_Card'=>'كارت المريض',
+          'Search'=>'بحث',
+          'Scan_QR_Code'=>'Scan QR Code',
+          'Assign_to_Clinic'=>'أضافة للعيادة',
+          'Enter_Patient_Code'=>'أدخل كود المريض',
+          'Add_Patient_Using_Code'=>'أضافة مريض باستخدام كود',
+          'Name'=>'الأسم',
+          'Assign_to_Lab'=>'أضافة للمختبر',
+          'Add_Analysis'=>'أضافة تحاليل',
+          'Number_of_Analysis'=>'عدد التحاليل',
+          'Analysis_Number'=>'رقم التحليل',
+          'Analysis'=>'تحليل',
+          'Date'=>'التاريخ',
+          'Cost'=>'التكاليف',
+          'Service_Fee'=>'الخدمات',
+          'Add_Rays'=>'أضافة أشعة',
+          'Doctor'=>'طبيب',
+          'Medical_Analysis_Count'=>'عدد التحاليل',
+          'Medical_Analysis'=>'تحليل',
+          'Price'=>'السعر',
+          'Notes'=>'الملاحظات',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+          ''=>'',
+
+
+
+
+
+];

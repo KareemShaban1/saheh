@@ -1,0 +1,14 @@
+1- add announcement module for organizations with notification on mobile application
+2- find suitable ui/ux for mobile application
+3- fix issues in chat module on all organizations (local , server)
+4- add voice to text feature to doctor (to allow doctor write diagnoses using this feature)
+5- handle offers that applied on services on organizations
+6- handle flow of (medical laboratories , radiology centers) as them work
+7- try to handle advanced topics on project like (load balance , modularity)
+8- add activity logs module to log (every) action happen on system
+9- add feature to allow organization to make their landing page in simple way
+
+
+25/10/2025 [future work]
+1- continue converting project to Modules
+2- ensure all modules are working fine

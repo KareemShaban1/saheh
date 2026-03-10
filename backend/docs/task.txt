@@ -1,0 +1,22 @@
+
+
+In app/Http/controllers/Backend/Admin
+- add reviewscotroller with the full crud to see all reviews from the PatientReview and when the admin does softdelete action, assign the id to changed_by
+- follow the same strcutrue of the code like in views and controler funcationlity and route of the project files
+
+In app/Http/controllers/Backend/Clinic
+- add reviewscotroller with only function to show all reviews that come to only this clinic with detials , only can show and review.
+- follow the same strcutrue of the code like in views and controler funcationlity and route of the project files
+
+In app/Http/controllers/Backend/MedicalLaboratory
+- add reviewscotroller with only function to show all reviews that come to only this MedicalLaboratory with detials , only can show and review.
+- follow the same strcutrue of the code like in views and controler funcationlity and route of the project files
+
+In app/Http/controllers/Backend/RadiologyCenter
+- add reviewscotroller with only function to show all reviews that come to only this RadiologyCenter with detials , only can show and review.
+- follow the same strcutrue of the code like in views and controler funcationlity and route of the project files
+
+you will new this table show all reviews 'PatientReview' and don't forget to add routes for each controller in it's related folder
+
+
+

@@ -1,0 +1,52 @@
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\File;
+
+class ModulesServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->registerModuleProviders(app_path('Modules'));
+    }
+
+    /**
+     * Recursively register all module providers inside a directory.
+     */
+    private function registerModuleProviders(string $basePath): void
+    {
+        // Get all directories recursively
+        $directories = File::allDirectories($basePath);
+
+        foreach ($directories as $dir) {
+            $providersPath = $dir . '/Providers';
+
+            // If this directory has a Providers folder, scan it
+            if (is_dir($providersPath)) {
+                $providerFiles = File::glob($providersPath . '/*.php');
+
+                foreach ($providerFiles as $providerFile) {
+                    $providerClass = $this->getClassFromFile($providerFile);
+
+                    if (class_exists($providerClass)) {
+                        $this->app->register($providerClass);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolve full class name from provider file path.
+     */
+    private function getClassFromFile(string $filePath): string
+    {
+        // Replace slashes with namespace separators and clean up
+        $relativePath = str_replace(app_path() . '/', '', $filePath);
+        $class = str_replace(['/', '.php'], ['\\', ''], $relativePath);
+
+        return "App\\{$class}";
+    }
+}
