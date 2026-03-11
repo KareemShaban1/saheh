@@ -13,6 +13,9 @@ use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Cashier\Billable;
 use Modules\Clinic\User\Models\UserDoctor;
+use App\Models\Clinic;
+use App\Models\MedicalLaboratory;
+use App\Models\RadiologyCenter;
 
 class User extends Authenticatable
 {
@@ -32,6 +35,28 @@ class User extends Authenticatable
      * @var string
      */
     protected $guard_name = 'web';
+
+    /**
+     * Resolve Spatie guard dynamically by organization type.
+     * This prevents GuardDoesNotMatch during role assignment in seeders.
+     */
+    protected function getDefaultGuardName(): string
+    {
+        return match ($this->organization_type) {
+            MedicalLaboratory::class => 'medical_laboratory',
+            RadiologyCenter::class => 'radiology_center',
+            Clinic::class, null, '' => 'web',
+            default => 'web',
+        };
+    }
+
+    /**
+     * Spatie uses this method when checking assignable role/permission guards.
+     */
+    public function guardName(): string
+    {
+        return $this->getDefaultGuardName();
+    }
 
 
 
