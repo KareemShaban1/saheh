@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Mic, Plus, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,12 +19,28 @@ type ReservationForm = {
 	payment: "paid" | "not_paid" | "unpaid";
 	acceptance: "pending" | "approved" | "not_approved";
 	month: string;
+	first_diagnosis: string;
+	final_diagnosis: string;
 };
 
 type ServiceRow = {
 	service_fee_id: string;
 	fee: string;
 	notes: string;
+};
+
+type VoiceRecord = {
+	id: number;
+	url: string;
+	file_name?: string;
+	size?: number;
+};
+
+type PendingVoiceRecord = {
+	id: string;
+	file: File;
+	previewUrl: string;
+	source: "uploaded" | "recorded";
 };
 
 function monthFromDate(date: string): string {
@@ -51,9 +67,19 @@ export default function ClinicReservationFormPage() {
 		payment: "not_paid",
 		acceptance: "approved",
 		month: "",
+		first_diagnosis: "",
+		final_diagnosis: "",
 	});
 	const [reservationMode, setReservationMode] = useState<"numbers" | "slots">("numbers");
 	const [Services, setServices] = useState<ServiceRow[]>([]);
+	const [pendingVoiceRecords, setPendingVoiceRecords] = useState<PendingVoiceRecord[]>([]);
+	const [existingVoiceRecords, setExistingVoiceRecords] = useState<VoiceRecord[]>([]);
+	const [removedVoiceRecordIds, setRemovedVoiceRecordIds] = useState<number[]>([]);
+	const [isRecording, setIsRecording] = useState(false);
+	const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+	const mediaStreamRef = useRef<MediaStream | null>(null);
+	const recordingChunksRef = useRef<Blob[]>([]);
+	const pendingVoiceRecordsRef = useRef<PendingVoiceRecord[]>([]);
 
 	const reservationDetailsQuery = useQuery({
 		queryKey: ["clinic", "reservation", id],
@@ -150,6 +176,9 @@ export default function ClinicReservationFormPage() {
 			payment?: ReservationForm["payment"];
 			acceptance?: ReservationForm["acceptance"];
 			month?: string;
+			first_diagnosis?: string | null;
+			final_diagnosis?: string | null;
+			voice_records?: Array<{ id: number; url: string; file_name?: string; size?: number }>;
 			reservation_mode?: "numbers" | "slots";
 			services?: Array<{ service_fee_id?: number; fee?: number; notes?: string }>;
 		};
@@ -168,6 +197,8 @@ export default function ClinicReservationFormPage() {
 			payment: details.payment ?? "not_paid",
 			acceptance: details.acceptance ?? "approved",
 			month: details.month ?? monthFromDate(details.date ?? ""),
+			first_diagnosis: details.first_diagnosis ?? "",
+			final_diagnosis: details.final_diagnosis ?? "",
 		});
 		setReservationMode(details.reservation_mode ?? (details.reservation_number ? "numbers" : "slots"));
 		setServices(
@@ -177,7 +208,33 @@ export default function ClinicReservationFormPage() {
 				notes: sf.notes ?? "",
 			})),
 		);
+		setExistingVoiceRecords(
+			(details.voice_records ?? []).map((item) => ({
+				id: Number(item.id),
+				url: item.url,
+				file_name: item.file_name,
+				size: item.size,
+			})),
+		);
+		setRemovedVoiceRecordIds([]);
+		setPendingVoiceRecords((prev) => {
+			prev.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+			return [];
+		});
 	}, [isEdit, reservationDetailsQuery.data]);
+
+	useEffect(() => {
+		pendingVoiceRecordsRef.current = pendingVoiceRecords;
+	}, [pendingVoiceRecords]);
+
+	useEffect(() => {
+		return () => {
+			pendingVoiceRecordsRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+			const recorder = mediaRecorderRef.current;
+			if (recorder && recorder.state !== "inactive") recorder.stop();
+			mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+		};
+	}, []);
 
 	useEffect(() => {
 		// Wait until options request resolves; otherwise edit value can be wiped before options load.
@@ -202,24 +259,32 @@ export default function ClinicReservationFormPage() {
 
 	const mutation = useMutation({
 		mutationFn: async () => {
-			const payload = {
-				patient_id: Number(form.patient_id),
-				doctor_id: Number(form.doctor_id),
-				date: form.date,
-				status: form.status,
-				payment: form.payment,
-				acceptance: form.acceptance,
-				month: form.month,
-				reservation_number: reservationMode === "numbers" ? form.reservation_value : null,
-				slot: reservationMode === "slots" ? form.reservation_value : null,
-				services: Services
-					.filter((sf) => sf.service_fee_id)
-					.map((sf) => ({
-						service_fee_id: Number(sf.service_fee_id),
-						fee: Number(sf.fee || 0),
-						notes: sf.notes || undefined,
-					})),
-			};
+			const services = Services
+				.filter((sf) => sf.service_fee_id)
+				.map((sf) => ({
+					service_fee_id: Number(sf.service_fee_id),
+					fee: Number(sf.fee || 0),
+					notes: sf.notes || undefined,
+				}));
+
+			const payload = new FormData();
+			payload.append("patient_id", String(Number(form.patient_id)));
+			payload.append("doctor_id", String(Number(form.doctor_id)));
+			payload.append("date", form.date);
+			payload.append("status", form.status);
+			payload.append("payment", form.payment);
+			payload.append("acceptance", form.acceptance);
+			payload.append("month", form.month);
+			payload.append("reservation_number", reservationMode === "numbers" ? form.reservation_value : "");
+			payload.append("slot", reservationMode === "slots" ? form.reservation_value : "");
+			payload.append("first_diagnosis", form.first_diagnosis.trim());
+			payload.append("final_diagnosis", form.final_diagnosis.trim());
+			payload.append("services", JSON.stringify(services));
+			if (removedVoiceRecordIds.length > 0) {
+				payload.append("remove_voice_record_ids", JSON.stringify(removedVoiceRecordIds));
+			}
+			pendingVoiceRecords.forEach((item) => payload.append("voice_records[]", item.file));
+
 			if (isEdit && id) {
 				return clinicApi.updateReservation(id, payload);
 			}
@@ -268,6 +333,95 @@ export default function ClinicReservationFormPage() {
 			return;
 		}
 		mutation.mutate();
+	};
+
+	const removeExistingVoiceRecord = (voiceId: number) => {
+		setExistingVoiceRecords((prev) => prev.filter((item) => item.id !== voiceId));
+		setRemovedVoiceRecordIds((prev) => (prev.includes(voiceId) ? prev : [...prev, voiceId]));
+	};
+
+	const addPendingVoiceFiles = (files: File[], source: "uploaded" | "recorded") => {
+		if (files.length === 0) return;
+		const now = Date.now();
+		const entries = files.map((file, index) => ({
+			id: `${source}-${now}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+			file,
+			previewUrl: URL.createObjectURL(file),
+			source,
+		}));
+		setPendingVoiceRecords((prev) => [...prev, ...entries]);
+	};
+
+	const removePendingVoiceRecord = (recordId: string) => {
+		setPendingVoiceRecords((prev) => {
+			const item = prev.find((voice) => voice.id === recordId);
+			if (item) URL.revokeObjectURL(item.previewUrl);
+			return prev.filter((voice) => voice.id !== recordId);
+		});
+	};
+
+	const startVoiceRecording = async () => {
+		try {
+			if (!navigator.mediaDevices?.getUserMedia) {
+				toast({
+					title: "Recording not supported",
+					description: "Your browser does not support microphone recording.",
+					variant: "destructive",
+				});
+				return;
+			}
+
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			mediaStreamRef.current = stream;
+			recordingChunksRef.current = [];
+
+			const preferredMimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"];
+			const supportedMimeType = preferredMimeTypes.find((mime) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(mime));
+			const recorder = supportedMimeType ? new MediaRecorder(stream, { mimeType: supportedMimeType }) : new MediaRecorder(stream);
+			mediaRecorderRef.current = recorder;
+
+			recorder.ondataavailable = (event) => {
+				if (event.data && event.data.size > 0) recordingChunksRef.current.push(event.data);
+			};
+
+			recorder.onstop = () => {
+				const mimeType = recorder.mimeType || "audio/webm";
+				const blob = new Blob(recordingChunksRef.current, { type: mimeType });
+				if (blob.size > 0) {
+					const extension = mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm";
+					const file = new File([blob], `voice-record-${Date.now()}.${extension}`, { type: mimeType });
+					addPendingVoiceFiles([file], "recorded");
+				}
+
+				mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+				mediaStreamRef.current = null;
+				recordingChunksRef.current = [];
+				setIsRecording(false);
+			};
+
+			recorder.start();
+			setIsRecording(true);
+		} catch (error) {
+			toast({
+				title: "Microphone access failed",
+				description: error instanceof Error ? error.message : "Unable to start recording.",
+				variant: "destructive",
+			});
+			mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+			mediaStreamRef.current = null;
+			setIsRecording(false);
+		}
+	};
+
+	const stopVoiceRecording = () => {
+		const recorder = mediaRecorderRef.current;
+		if (!recorder || recorder.state === "inactive") {
+			setIsRecording(false);
+			mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+			mediaStreamRef.current = null;
+			return;
+		}
+		recorder.stop();
 	};
 
 	if (!isEdit && !patientIdFromQuery) {
@@ -457,6 +611,89 @@ export default function ClinicReservationFormPage() {
 							</div>
 						</div>
 					))}
+				</div>
+
+				<div className="grid sm:grid-cols-2 gap-4">
+					<div className="space-y-2">
+						<Label>First Diagnosis</Label>
+						<Textarea
+							rows={4}
+							value={form.first_diagnosis}
+							onChange={(e) => setForm((f) => ({ ...f, first_diagnosis: e.target.value }))}
+							placeholder="Initial diagnosis notes"
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label>Final Diagnosis</Label>
+						<Textarea
+							rows={4}
+							value={form.final_diagnosis}
+							onChange={(e) => setForm((f) => ({ ...f, final_diagnosis: e.target.value }))}
+							placeholder="Final diagnosis notes"
+						/>
+					</div>
+				</div>
+
+				<div className="space-y-2">
+					<Label>Voice Records (Doctor)</Label>
+					<div className="flex flex-wrap items-center gap-2">
+						<Button type="button" variant={isRecording ? "destructive" : "outline"} className="gap-2" onClick={isRecording ? stopVoiceRecording : startVoiceRecording}>
+							{isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+							{isRecording ? "Stop Recording" : "Record Voice"}
+						</Button>
+						<Input
+							type="file"
+							accept="audio/*"
+							multiple
+							onChange={(e) => {
+								const files = Array.from(e.target.files ?? []);
+								addPendingVoiceFiles(files, "uploaded");
+								e.currentTarget.value = "";
+							}}
+							className="max-w-sm"
+						/>
+					</div>
+					{isRecording && <p className="text-xs text-destructive">Recording in progress...</p>}
+					{pendingVoiceRecords.length > 0 && (
+						<div className="space-y-2">
+							<p className="text-xs text-muted-foreground">Pending voice records:</p>
+							{pendingVoiceRecords.map((record) => (
+								<div key={record.id} className="rounded-md border p-2 space-y-2">
+									<div className="flex items-center justify-between gap-2">
+										<p className="text-xs text-muted-foreground truncate">
+											{record.file.name} {record.source === "recorded" ? "(recorded)" : "(uploaded)"}
+										</p>
+										<Button type="button" size="sm" variant="ghost" onClick={() => removePendingVoiceRecord(record.id)}>
+											<Trash2 className="h-4 w-4 text-destructive" />
+										</Button>
+									</div>
+									<audio controls className="w-full">
+										<source src={record.previewUrl} type={record.file.type || "audio/webm"} />
+									</audio>
+								</div>
+							))}
+						</div>
+					)}
+					{existingVoiceRecords.length > 0 && (
+						<div className="space-y-2">
+							<p className="text-xs text-muted-foreground">Existing voice records:</p>
+							{existingVoiceRecords.map((voice) => (
+								<div key={voice.id} className="rounded-md border p-2 space-y-2">
+									<div className="flex items-center justify-between gap-2">
+										<a href={voice.url} target="_blank" rel="noreferrer" className="text-sm text-primary underline truncate">
+											{voice.file_name ?? `Voice #${voice.id}`}
+										</a>
+										<Button type="button" size="sm" variant="ghost" onClick={() => removeExistingVoiceRecord(voice.id)}>
+											<Trash2 className="h-4 w-4 text-destructive" />
+										</Button>
+									</div>
+									<audio controls className="w-full">
+										<source src={voice.url} />
+									</audio>
+								</div>
+							))}
+						</div>
+					)}
 				</div>
 
 				<div className="flex justify-end gap-2">

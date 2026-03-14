@@ -10,6 +10,7 @@ const navLinks = [
   { key: "nav.clinics", to: "/clinics" },
   { key: "nav.labs", to: "/labs" },
   { key: "nav.radiology", to: "/radiology-centers" },
+	{ key: "auth.dashboardLogin", to: "/dashboard-login" },
 ];
 
 export default function PublicLayout() {
@@ -118,7 +119,7 @@ export default function PublicLayout() {
                 <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center">
                   <Stethoscope className="h-4 w-4 text-primary-foreground" />
                 </div>
-                MediCare
+                {t("brand.name")}
               </Link>
               <p className="mt-2 text-sm text-muted-foreground max-w-xs">
                 {t("public.footer.description")}
@@ -136,6 +137,7 @@ export default function PublicLayout() {
                 <Link to="/radiology-centers" className="block text-muted-foreground hover:text-foreground">
                   {t("nav.radiology")}
                 </Link>
+		
               </div>
               <div className="space-y-2">
                 <p className="font-semibold">{t("public.footer.dashboards")}</p>

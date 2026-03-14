@@ -24,6 +24,32 @@ type Permission = {
 
 const emptyForm = { name: "", permission_ids: [] as number[] };
 
+type PermissionGroup = {
+  key: string;
+  label: string;
+  permissions: Permission[];
+};
+
+function getPermissionGroupKey(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "other";
+  if (trimmed.startsWith("manage ")) {
+    return trimmed.replace("manage ", "").trim() || "other";
+  }
+  if (trimmed.includes(".")) return trimmed.split(".")[0].trim() || "other";
+  if (trimmed.includes(":")) return trimmed.split(":")[0].trim() || "other";
+  if (trimmed.includes(" ")) return trimmed.split(" ")[1]?.trim() || "other";
+  return trimmed;
+}
+
+function toGroupLabel(key: string): string {
+  return key
+    .split(/[-_ ]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export default function RadiologyRoles() {
   const queryClient = useQueryClient();
   const [modalMode, setModalMode] = useState<"create" | "edit" | "show" | null>(null);
@@ -31,6 +57,7 @@ export default function RadiologyRoles() {
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const { toast } = useToast();
 
   const rolesQuery = useQuery({
@@ -51,6 +78,23 @@ export default function RadiologyRoles() {
     const root = (permissionsQuery.data as { data?: unknown })?.data ?? permissionsQuery.data;
     return Array.isArray(root) ? (root as Permission[]) : [];
   }, [permissionsQuery.data]);
+
+  const permissionGroups = useMemo<PermissionGroup[]>(() => {
+    const map = new Map<string, Permission[]>();
+    for (const permission of permissions) {
+      const key = getPermissionGroupKey(permission.name);
+      const current = map.get(key) ?? [];
+      current.push(permission);
+      map.set(key, current);
+    }
+    return Array.from(map.entries())
+      .map(([key, groupedPermissions]) => ({
+        key,
+        label: toGroupLabel(key),
+        permissions: groupedPermissions.sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [permissions]);
 
   const filtered = roles.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -108,27 +152,37 @@ export default function RadiologyRoles() {
     setForm(emptyForm);
     setModalMode("create");
   };
-  const openShow = async (r: Role) => {
+  const hydrateRoleDetails = async (r: Role, mode: "show" | "edit") => {
+    setModalMode(mode);
     setActiveId(r.id);
-    const res = await radiologyApi.role(r.id);
-    const root = (res as { data?: unknown })?.data ?? {};
-    const details = (root && typeof root === "object" ? root : {}) as { name?: string; permission_ids?: number[] };
-    setForm({
-      name: String(details.name ?? r.name),
-      permission_ids: Array.isArray(details.permission_ids) ? details.permission_ids : [],
-    });
-    setModalMode("show");
+    setForm({ name: String(r.name ?? ""), permission_ids: [] });
+    setDetailsLoading(true);
+    try {
+      const res = await radiologyApi.role(r.id);
+      const root = (res as { data?: unknown })?.data ?? {};
+      const details = (root && typeof root === "object" ? root : {}) as { name?: string; permission_ids?: number[] };
+      setForm({
+        name: String(details.name ?? r.name),
+        permission_ids: Array.isArray(details.permission_ids) ? details.permission_ids : [],
+      });
+    } catch (e) {
+      toast({
+        title: "Failed to load role details",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+      setModalMode(null);
+    } finally {
+      setDetailsLoading(false);
+    }
   };
+
+  const openShow = async (r: Role) => {
+    await hydrateRoleDetails(r, "show");
+  };
+
   const openEdit = async (r: Role) => {
-    setActiveId(r.id);
-    const res = await radiologyApi.role(r.id);
-    const root = (res as { data?: unknown })?.data ?? {};
-    const details = (root && typeof root === "object" ? root : {}) as { name?: string; permission_ids?: number[] };
-    setForm({
-      name: String(details.name ?? r.name),
-      permission_ids: Array.isArray(details.permission_ids) ? details.permission_ids : [],
-    });
-    setModalMode("edit");
+    await hydrateRoleDetails(r, "edit");
   };
 
   const togglePerm = (p: number) => {
@@ -136,6 +190,18 @@ export default function RadiologyRoles() {
       ...f,
       permission_ids: f.permission_ids.includes(p) ? f.permission_ids.filter((x) => x !== p) : [...f.permission_ids, p],
     }));
+  };
+
+  const togglePermissionGroup = (permissionIds: number[], checked: boolean) => {
+    setForm((f) => {
+      const current = new Set(f.permission_ids);
+      if (checked) {
+        permissionIds.forEach((id) => current.add(id));
+      } else {
+        permissionIds.forEach((id) => current.delete(id));
+      }
+      return { ...f, permission_ids: Array.from(current) };
+    });
   };
 
   const save = () => {
@@ -172,25 +238,31 @@ export default function RadiologyRoles() {
                 <div className="h-10 w-10 rounded-lg bg-sidebar-accent flex items-center justify-center"><Shield className="h-5 w-5 text-primary" /></div>
                 <div>
                   <h3 className="font-semibold">{role.name}</h3>
-                  <p className="text-sm text-muted-foreground">{role.description}</p>
+                  <p className="text-sm text-muted-foreground">Role for radiology dashboard access control.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline">{role.users_count ?? 0} users</Badge>
                 <Badge variant="outline">{role.permissions_count ?? 0} permissions</Badge>
                 <button title="Show role" onClick={() => void openShow(role)} className="p-1.5 rounded hover:bg-muted"><Eye className="h-4 w-4 text-muted-foreground" /></button>
-                <button title="Edit role" onClick={() => openEdit(role)} className="p-1.5 rounded hover:bg-muted"><Edit className="h-4 w-4 text-muted-foreground" /></button>
+                <button title="Edit role" onClick={() => void openEdit(role)} className="p-1.5 rounded hover:bg-muted"><Edit className="h-4 w-4 text-muted-foreground" /></button>
                 <button title="Delete role" onClick={() => setDeleteConfirm(String(role.id))} className="p-1.5 rounded hover:bg-muted"><Trash2 className="h-4 w-4 text-destructive" /></button>
               </div>
             </div>
           </div>
         ))}
+        {!rolesQuery.isLoading && !rolesQuery.error && filtered.length === 0 ? (
+          <div className="text-sm text-muted-foreground">No roles found.</div>
+        ) : null}
       </div>
 
       <Dialog open={modalMode !== null} onOpenChange={(open) => !open && setModalMode(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{modalMode === "create" ? "New Role" : modalMode === "edit" ? "Edit Role" : "Role Details"}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
+            {detailsLoading ? (
+              <div className="text-sm text-muted-foreground">Loading role details...</div>
+            ) : null}
             <div className="grid gap-2"><Label>Role Name</Label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} disabled={modalMode === "show"} /></div>
 
             <div>
@@ -200,27 +272,73 @@ export default function RadiologyRoles() {
                   {form.permission_ids.length === permissions.length ? "Deselect All" : "Select All"}
                 </Button>
               </div>
-              <div className="border rounded-lg p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {permissions.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2">
-                    <Checkbox
-                      checked={form.permission_ids.includes(p.id)}
-                      onCheckedChange={() => togglePerm(p.id)}
-                      id={`perm-${p.id}`}
-                      disabled={modalMode === "show"}
-                    />
-                    <label htmlFor={`perm-${p.id}`} className="text-sm text-muted-foreground cursor-pointer">
-                      {p.name}
-                    </label>
-                  </div>
-                ))}
+              <div className="border rounded-lg p-3 space-y-4">
+                {permissionsQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading permissions...</p> : null}
+                {permissionsQuery.error ? (
+                  <p className="text-sm text-destructive">{permissionsQuery.error instanceof Error ? permissionsQuery.error.message : "Failed to load permissions"}</p>
+                ) : null}
+                {!permissionsQuery.isLoading && !permissionsQuery.error && permissions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No permissions found.</p>
+                ) : null}
+                {permissionGroups.map((group) => {
+                  const groupPermissionIds = group.permissions.map((permission) => permission.id);
+                  const selectedCount = groupPermissionIds.filter((id) => form.permission_ids.includes(id)).length;
+                  const isChecked = selectedCount === groupPermissionIds.length && groupPermissionIds.length > 0;
+                  const isIndeterminate = selectedCount > 0 && selectedCount < groupPermissionIds.length;
+                  return (
+                    <div key={group.key} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">{group.label}</label>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={isChecked ? true : isIndeterminate ? "indeterminate" : false}
+                            onCheckedChange={(state) =>
+                              togglePermissionGroup(groupPermissionIds, state === true)
+                            }
+                            disabled={modalMode === "show" || detailsLoading}
+                            id={`perm-group-${group.key}`}
+                          />
+                          <label
+                            htmlFor={`perm-group-${group.key}`}
+                            className="text-xs text-muted-foreground cursor-pointer"
+                          >
+                            {selectedCount}/{groupPermissionIds.length}
+                          </label>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {group.permissions.map((p) => (
+                          <div key={p.id} className="flex items-center gap-2">
+                            <Checkbox
+                              checked={form.permission_ids.includes(p.id)}
+                              onCheckedChange={(state) => {
+                                const checked = state === true;
+                                const alreadySelected = form.permission_ids.includes(p.id);
+                                if (checked && !alreadySelected) togglePerm(p.id);
+                                if (!checked && alreadySelected) togglePerm(p.id);
+                              }}
+                              id={`perm-${p.id}`}
+                              disabled={modalMode === "show" || detailsLoading}
+                            />
+                            <label htmlFor={`perm-${p.id}`} className="text-sm text-muted-foreground cursor-pointer">
+                              {p.name}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!permissionsQuery.isLoading && !permissionsQuery.error && permissionGroups.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No grouped permissions available.</p>
+                ) : null}
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalMode(null)}>Close</Button>
             {modalMode !== "show" ? (
-              <Button onClick={save} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button onClick={save} disabled={createMutation.isPending || updateMutation.isPending || detailsLoading}>
                 {createMutation.isPending || updateMutation.isPending ? "Saving..." : modalMode === "edit" ? "Update" : "Create"}
               </Button>
             ) : null}

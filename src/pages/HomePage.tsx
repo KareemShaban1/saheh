@@ -138,7 +138,7 @@ export default function HomePage() {
               </Button>
             </Link>
             <Link to="/patient/appointments">
-              <Button size="lg" variant="outline" className="gap-2 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
+              <Button size="lg" variant="outline" className="gap-2 border-primary-foreground/30 text-primary hover:bg-primary-foreground/10">
                 Sign In
               </Button>
             </Link>

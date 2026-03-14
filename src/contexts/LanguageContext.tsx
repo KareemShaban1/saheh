@@ -74,7 +74,7 @@ const translations: Record<Language, Record<string, string>> = {
     "auth.select": "Select",
 
     // Public
-    "brand.name": "MediCare",
+    "brand.name": "Saheh",
     "public.footer.platform": "Platform",
     "public.footer.dashboards": "Dashboards",
     "public.footer.description":
@@ -102,6 +102,7 @@ const translations: Record<Language, Record<string, string>> = {
 	"clinic.menu.announcements": "Announcements",
 	"clinic.menu.notifications": "Notifications",
 	"clinic.menu.services": "Services",
+  "clinic.menu.settings": "Settings",
 	"clinic.menu.inventory": "Inventory",
 	"clinic.menu.modules": "Modules",
 	"clinic.menu.financial": "Financial",
@@ -328,6 +329,7 @@ const translations: Record<Language, Record<string, string>> = {
     "radiology.menu.dashboard": "Dashboard",
     "radiology.menu.reservations": "Reservations",
     "radiology.menu.rays": "Rays",
+    "radiology.menu.ray_categories": "Ray Categories",
     "radiology.menu.users": "Users",
     "radiology.menu.patients": "Patients",
     "radiology.menu.roles": "Roles",
@@ -419,7 +421,7 @@ const translations: Record<Language, Record<string, string>> = {
     "auth.select": "اختر",
 
     // Public
-    "brand.name": "ميدي كير",
+    "brand.name": "صحيح",
     "public.footer.platform": "المنصة",
     "public.footer.dashboards": "لوحات التحكم",
     "public.footer.description":
@@ -444,6 +446,7 @@ const translations: Record<Language, Record<string, string>> = {
     "clinic.menu.roles": "الصلاحيات والأدوار",
     "clinic.menu.clinic_management": "إدارة العيادة",
     "clinic.menu.services": "الخدمات",
+  "clinic.menu.settings": "الإعدادات",
     "clinic.menu.inventory": "المخزون",
     "clinic.menu.announcements": "الإعلانات",
     "clinic.menu.reviews": "التقييمات",
@@ -745,6 +748,7 @@ const translations: Record<Language, Record<string, string>> = {
     "radiology.menu.dashboard": "الرئيسية",
     "radiology.menu.reservations": "الحجوزات",
     "radiology.menu.rays": "الأشعة",
+    "radiology.menu.ray_categories": "فئات الأشعة",
     "radiology.menu.users": "المستخدمون",
     "radiology.menu.patients": "المرضى",
     "radiology.menu.roles": "الأدوار",

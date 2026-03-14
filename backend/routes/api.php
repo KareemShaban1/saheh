@@ -228,6 +228,8 @@ Route::prefix('clinic')->middleware(['auth:organization_api', 'organization.type
     Route::get('/services/{id}', [ClinicDashboardApiController::class, 'serviceDetails']);
     Route::post('/services', [ClinicDashboardApiController::class, 'createService']);
     Route::put('/services/{id}', [ClinicDashboardApiController::class, 'updateService']);
+    Route::get('/settings', [ClinicDashboardApiController::class, 'clinicSettings']);
+    Route::put('/settings', [ClinicDashboardApiController::class, 'updateClinicSettings']);
     Route::get('/modules', [ClinicDashboardApiController::class, 'modules']);
     Route::get('/inventory/categories', [ClinicDashboardApiController::class, 'inventoryCategories']);
     Route::get('/inventory/movements', [ClinicDashboardApiController::class, 'inventoryMovements']);
@@ -340,6 +342,11 @@ Route::prefix('radiologyCenter')->middleware(['auth:organization_api', 'organiza
     Route::post('/rays', [RadiologyCenterDashboardApiController::class, 'createRay']);
     Route::put('/rays/{id}', [RadiologyCenterDashboardApiController::class, 'updateRay']);
     Route::delete('/rays/{id}', [RadiologyCenterDashboardApiController::class, 'deleteRay']);
+    Route::get('/ray-categories', [RadiologyCenterDashboardApiController::class, 'rayCategories']);
+    Route::get('/ray-categories/{id}', [RadiologyCenterDashboardApiController::class, 'rayCategoryDetails']);
+    Route::post('/ray-categories', [RadiologyCenterDashboardApiController::class, 'createRayCategory']);
+    Route::put('/ray-categories/{id}', [RadiologyCenterDashboardApiController::class, 'updateRayCategory']);
+    Route::delete('/ray-categories/{id}', [RadiologyCenterDashboardApiController::class, 'deleteRayCategory']);
     Route::get('/users', [RadiologyCenterDashboardApiController::class, 'users']);
     Route::get('/users/{id}', [RadiologyCenterDashboardApiController::class, 'userDetails']);
     Route::post('/users', [RadiologyCenterDashboardApiController::class, 'createUser']);

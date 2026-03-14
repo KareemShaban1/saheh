@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { withCachedFetch, withCachedQuery } from "@/lib/queryCache";
 
 type UserRow = {
   id: string | number;
@@ -51,23 +52,29 @@ export default function ClinicUsers() {
   const perPage = 10;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["clinic", "users", page, perPage, search],
-    queryFn: () =>
+    ...withCachedQuery({
+      queryKey: ["clinic", "users", page, perPage, search],
+      queryFn: () =>
       clinicApi.users({
         page: String(page),
         per_page: String(perPage),
         ...(search.trim() ? { search: search.trim() } : {}),
       }),
+    }),
   });
 
   const rolesQuery = useQuery({
-    queryKey: ["clinic", "roles"],
-    queryFn: () => clinicApi.roles(),
+    ...withCachedQuery({
+      queryKey: ["clinic", "roles"],
+      queryFn: () => clinicApi.roles(),
+    }),
   });
 
   const permissionsQuery = useQuery({
-    queryKey: ["clinic", "permissions"],
-    queryFn: () => clinicApi.permissions(),
+    ...withCachedQuery({
+      queryKey: ["clinic", "permissions"],
+      queryFn: () => clinicApi.permissions(),
+    }),
   });
 
   const users = useMemo<UserRow[]>(() => {
@@ -183,7 +190,9 @@ export default function ClinicUsers() {
   const openEdit = async (row: UserRow) => {
     setDialogMode("edit");
     setActiveId(String(row.id));
-    const details = await clinicApi.user(row.id);
+    const details = await queryClient.fetchQuery(
+      withCachedFetch(["clinic", "users", "details", row.id], () => clinicApi.user(row.id)),
+    );
     const root = (details as { data?: unknown })?.data ?? details;
     const userData = root as {
       name?: string;

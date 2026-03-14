@@ -9,11 +9,13 @@ use Carbon\Carbon;
 use App\Models\Shared\Patient;
 use App\Models\Shared\Event;
 use App\Models\Ray;
+use App\Models\RayCategory;
 use App\Models\RadiologyCenter;
 use Modules\Clinic\User\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -432,9 +434,11 @@ class RadiologyCenterDashboardApiController extends Controller
     {
         $this->ensureRadiologyAuth();
         $orgId = request()->user()->organization_id;
+        $guard = 'radiology_center';
 
         $roles = Role::query()
             ->where('team_id', $orgId)
+            ->where('guard_name', $guard)
             ->withCount('permissions')
             ->withCount('users')
             ->orderBy('id')
@@ -454,10 +458,12 @@ class RadiologyCenterDashboardApiController extends Controller
     {
         $this->ensureRadiologyAuth();
         $orgId = request()->user()->organization_id;
+        $guard = 'radiology_center';
 
         $permissionIds = DB::table('role_has_permissions')
             ->join('roles', 'roles.id', '=', 'role_has_permissions.role_id')
             ->where('roles.team_id', $orgId)
+            ->where('roles.guard_name', $guard)
             ->pluck('role_has_permissions.permission_id')
             ->unique()
             ->values();
@@ -475,9 +481,11 @@ class RadiologyCenterDashboardApiController extends Controller
     {
         $this->ensureRadiologyAuth();
         $orgId = request()->user()->organization_id;
+        $guard = 'radiology_center';
 
         $role = Role::query()
             ->where('team_id', $orgId)
+            ->where('guard_name', $guard)
             ->with('permissions:id,name')
             ->findOrFail($id);
 
@@ -486,6 +494,7 @@ class RadiologyCenterDashboardApiController extends Controller
             'name' => $role->name,
             'guard_name' => $role->guard_name,
             'permissions_count' => $role->permissions->count(),
+            'users_count' => (int) $role->users()->count(),
             'permission_ids' => $role->permissions->pluck('id')->map(fn ($v) => (int) $v)->values(),
             'permissions' => $role->permissions->map(fn ($p) => ['id' => $p->id, 'name' => $p->name])->values(),
         ], 'Role details', 'success');
@@ -495,15 +504,17 @@ class RadiologyCenterDashboardApiController extends Controller
     {
         $this->ensureRadiologyAuth();
         $orgId = request()->user()->organization_id;
+        $guard = 'radiology_center';
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'permission_ids' => 'nullable|array',
-            'permission_ids.*' => 'required|exists:permissions,id',
+            'permission_ids.*' => 'required|integer|exists:permissions,id',
         ]);
 
         $exists = Role::query()
             ->where('team_id', $orgId)
+            ->where('guard_name', $guard)
             ->where('name', trim($validated['name']))
             ->exists();
         if ($exists) {
@@ -514,12 +525,27 @@ class RadiologyCenterDashboardApiController extends Controller
 
         $role = Role::create([
             'name' => trim($validated['name']),
-            'guard_name' => 'web',
+            'guard_name' => $guard,
             'team_id' => $orgId,
         ]);
 
+        $permissionIds = collect($validated['permission_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+        $allowedIds = Permission::query()
+            ->where('guard_name', $guard)
+            ->whereIn('id', $permissionIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($allowedIds->count() !== $permissionIds->count()) {
+            throw ValidationException::withMessages([
+                'permission_ids' => ['One or more selected permissions are invalid for radiology roles.'],
+            ]);
+        }
+
         $permissions = Permission::query()
-            ->whereIn('id', $validated['permission_ids'] ?? [])
+            ->where('guard_name', $guard)
+            ->whereIn('id', $allowedIds->all())
             ->pluck('name')
             ->toArray();
         $role->syncPermissions($permissions);
@@ -535,19 +561,22 @@ class RadiologyCenterDashboardApiController extends Controller
     {
         $this->ensureRadiologyAuth();
         $orgId = request()->user()->organization_id;
+        $guard = 'radiology_center';
 
         $role = Role::query()
             ->where('team_id', $orgId)
+            ->where('guard_name', $guard)
             ->findOrFail($id);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'permission_ids' => 'nullable|array',
-            'permission_ids.*' => 'required|exists:permissions,id',
+            'permission_ids.*' => 'required|integer|exists:permissions,id',
         ]);
 
         $exists = Role::query()
             ->where('team_id', $orgId)
+            ->where('guard_name', $guard)
             ->where('name', trim($validated['name']))
             ->where('id', '!=', $role->id)
             ->exists();
@@ -558,8 +587,23 @@ class RadiologyCenterDashboardApiController extends Controller
         }
 
         $role->update(['name' => trim($validated['name'])]);
+        $permissionIds = collect($validated['permission_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+        $allowedIds = Permission::query()
+            ->where('guard_name', $guard)
+            ->whereIn('id', $permissionIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($allowedIds->count() !== $permissionIds->count()) {
+            throw ValidationException::withMessages([
+                'permission_ids' => ['One or more selected permissions are invalid for radiology roles.'],
+            ]);
+        }
+
         $permissions = Permission::query()
-            ->whereIn('id', $validated['permission_ids'] ?? [])
+            ->where('guard_name', $guard)
+            ->whereIn('id', $allowedIds->all())
             ->pluck('name')
             ->toArray();
         $role->syncPermissions($permissions);
@@ -575,13 +619,156 @@ class RadiologyCenterDashboardApiController extends Controller
     {
         $this->ensureRadiologyAuth();
         $orgId = request()->user()->organization_id;
+        $guard = 'radiology_center';
 
         $role = Role::query()
             ->where('team_id', $orgId)
+            ->where('guard_name', $guard)
             ->findOrFail($id);
         $role->delete();
 
         return $this->returnJSON(['id' => (int) $id], 'Role deleted', 'success');
+    }
+
+    /**
+     * Ray categories list for radiology dashboard.
+     */
+    public function rayCategories(Request $request)
+    {
+        $this->ensureRadiologyAuth();
+        $authUser = request()->user();
+
+        $query = RayCategory::query()
+            ->where('organization_id', $authUser->organization_id)
+            ->where('organization_type', $authUser->organization_type)
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $search = trim((string) $request->search);
+                $q->where(function ($inner) use ($search) {
+                    $inner->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('description', 'like', '%' . $search . '%');
+                });
+            })
+            ->orderByDesc('id');
+
+        $perPage = (int) $request->get('per_page', 15);
+        $paginated = $query->paginate($perPage);
+
+        $data = $paginated->getCollection()->map(fn ($category) => [
+            'id' => $category->id,
+            'name' => $category->name,
+            'description' => $category->description,
+            'created_at' => optional($category->created_at)->format('Y-m-d'),
+        ])->values();
+
+        return $this->returnJSON([
+            'data' => $data,
+            'pagination' => $this->pagination($paginated),
+        ], 'Ray categories', 'success');
+    }
+
+    /**
+     * Single ray category details.
+     */
+    public function rayCategoryDetails($id)
+    {
+        $this->ensureRadiologyAuth();
+        $authUser = request()->user();
+
+        $category = RayCategory::query()
+            ->where('organization_id', $authUser->organization_id)
+            ->where('organization_type', $authUser->organization_type)
+            ->findOrFail($id);
+
+        return $this->returnJSON([
+            'id' => $category->id,
+            'name' => $category->name,
+            'description' => $category->description,
+            'created_at' => optional($category->created_at)->format('Y-m-d'),
+        ], 'Ray category details', 'success');
+    }
+
+    /**
+     * Create a new ray category.
+     */
+    public function createRayCategory(Request $request)
+    {
+        $this->ensureRadiologyAuth();
+        $authUser = request()->user();
+
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('ray_categories', 'name')
+                    ->where(fn ($q) => $q
+                        ->where('organization_id', $authUser->organization_id)
+                        ->where('organization_type', $authUser->organization_type)),
+            ],
+            'description' => 'nullable|string|max:2000',
+        ]);
+
+        $category = RayCategory::create([
+            'name' => trim($validated['name']),
+            'description' => $validated['description'] ?? null,
+            'organization_id' => $authUser->organization_id,
+            'organization_type' => $authUser->organization_type,
+        ]);
+
+        return $this->returnJSON(['id' => $category->id], 'Ray category created', 'success');
+    }
+
+    /**
+     * Update an existing ray category.
+     */
+    public function updateRayCategory(Request $request, $id)
+    {
+        $this->ensureRadiologyAuth();
+        $authUser = request()->user();
+
+        $category = RayCategory::query()
+            ->where('organization_id', $authUser->organization_id)
+            ->where('organization_type', $authUser->organization_type)
+            ->findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('ray_categories', 'name')
+                    ->ignore($category->id)
+                    ->where(fn ($q) => $q
+                        ->where('organization_id', $authUser->organization_id)
+                        ->where('organization_type', $authUser->organization_type)),
+            ],
+            'description' => 'nullable|string|max:2000',
+        ]);
+
+        $category->update([
+            'name' => trim($validated['name']),
+            'description' => $validated['description'] ?? null,
+        ]);
+
+        return $this->returnJSON(['id' => $category->id], 'Ray category updated', 'success');
+    }
+
+    /**
+     * Delete a ray category.
+     */
+    public function deleteRayCategory($id)
+    {
+        $this->ensureRadiologyAuth();
+        $authUser = request()->user();
+
+        $category = RayCategory::query()
+            ->where('organization_id', $authUser->organization_id)
+            ->where('organization_type', $authUser->organization_type)
+            ->findOrFail($id);
+
+        $category->delete();
+
+        return $this->returnJSON(['id' => (int) $id], 'Ray category deleted', 'success');
     }
 
     /**

@@ -70,6 +70,7 @@ class RolePermissionSeeder extends Seeder
             'announcements',
             'notifications',
             'services',
+            'settings',
             'inventory',
             'financial',
             'modules',
@@ -171,7 +172,9 @@ class RolePermissionSeeder extends Seeder
     {
         $modules = [
             'dashboard',
-            'reservations',
+            'rays',
+            'ray-categories',
+            'users',
             'patients',
             'chat',
             'chats',

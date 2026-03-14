@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Smile } from "lucide-react";
+import { Mic, Smile, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +34,7 @@ type Message = {
   is_mine: boolean;
   message?: string;
   image_url?: string | null;
+  voice_url?: string | null;
   created_at?: string;
 };
 
@@ -47,7 +48,13 @@ export default function OrganizationChatPage() {
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [messageText, setMessageText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [voicePreviewUrl, setVoicePreviewUrl] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
 
   const contactsQuery = useQuery({
     queryKey: ["org-chat", "contacts"],
@@ -90,12 +97,13 @@ export default function OrganizationChatPage() {
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!selectedChatId) throw new Error("No conversation selected");
-      if (!messageText.trim() && !imageFile) throw new Error("Type a message or attach image");
+      if (!messageText.trim() && !imageFile && !voiceFile) throw new Error("Type a message or attach media");
 
-      if (imageFile) {
+      if (imageFile || voiceFile) {
         const fd = new FormData();
         fd.append("message", messageText.trim());
-        fd.append("image", imageFile);
+        if (imageFile) fd.append("image", imageFile);
+        if (voiceFile) fd.append("voice", voiceFile);
         return organizationChatApi.sendMessage(selectedChatId, fd);
       }
       return organizationChatApi.sendMessage(selectedChatId, { message: messageText.trim() });
@@ -103,6 +111,9 @@ export default function OrganizationChatPage() {
     onSuccess: async () => {
       setMessageText("");
       setImageFile(null);
+      setVoiceFile(null);
+      if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+      setVoicePreviewUrl(null);
       await queryClient.invalidateQueries({ queryKey: ["org-chat", "messages", selectedChatId] });
       await queryClient.invalidateQueries({ queryKey: ["org-chat", "conversations"] });
     },
@@ -147,6 +158,86 @@ export default function OrganizationChatPage() {
   const appendEmoji = (emoji: string) => {
     setMessageText((prev) => `${prev}${emoji}`);
   };
+
+  const clearVoiceAttachment = () => {
+    setVoiceFile(null);
+    if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+    setVoicePreviewUrl(null);
+  };
+
+  const stopVoiceRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") {
+      setIsRecording(false);
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      return;
+    }
+    recorder.stop();
+  };
+
+  const startVoiceRecording = async () => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        toast({
+          title: "Recording not supported",
+          description: "Your browser does not support microphone recording.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      recordingChunksRef.current = [];
+
+      const preferredMimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"];
+      const supportedMimeType = preferredMimeTypes.find((mime) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(mime));
+      const recorder = supportedMimeType ? new MediaRecorder(stream, { mimeType: supportedMimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) recordingChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(recordingChunksRef.current, { type: mimeType });
+        if (blob.size > 0) {
+          const extension = mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm";
+          const file = new File([blob], `chat-voice-${Date.now()}.${extension}`, { type: mimeType });
+          setVoiceFile(file);
+          if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+          setVoicePreviewUrl(URL.createObjectURL(file));
+        }
+        mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        recordingChunksRef.current = [];
+        setIsRecording(false);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      toast({
+        title: "Microphone access failed",
+        description: error instanceof Error ? error.message : "Unable to start recording.",
+        variant: "destructive",
+      });
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      setIsRecording(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, [voicePreviewUrl]);
 
   return (
     <div className="space-y-4">
@@ -243,6 +334,11 @@ export default function OrganizationChatPage() {
                         <img src={m.image_url} alt="attachment" className="mt-2 max-h-56 rounded border object-cover" />
                       </a>
                     ) : null}
+                    {m.voice_url ? (
+                      <audio controls className="mt-2 w-full max-w-xs">
+                        <source src={m.voice_url} />
+                      </audio>
+                    ) : null}
                     <p className={`text-[10px] mt-1 ${m.is_mine ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
                       {m.created_at || ""}
                     </p>
@@ -282,6 +378,20 @@ export default function OrganizationChatPage() {
                 </div>
               </div>
             ) : null}
+            {voiceFile && voicePreviewUrl ? (
+              <div className="rounded-md border p-2 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground truncate">{voiceFile.name}</p>
+                  <Button type="button" variant="ghost" size="icon" onClick={clearVoiceAttachment} title="Remove voice">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+                <audio controls className="w-full">
+                  <source src={voicePreviewUrl} type={voiceFile.type || "audio/webm"} />
+                </audio>
+              </div>
+            ) : null}
+            {isRecording ? <p className="text-xs text-destructive">Recording in progress...</p> : null}
             <div className="flex items-center gap-2">
               <Button
                 type="button"
@@ -299,6 +409,16 @@ export default function OrganizationChatPage() {
                 onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
                 disabled={selectedChatId === null}
               />
+              <Button
+                type="button"
+                variant={isRecording ? "destructive" : "outline"}
+                size="icon"
+                onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                disabled={selectedChatId === null}
+                title={isRecording ? "Stop recording" : "Record voice"}
+              >
+                {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </Button>
               <Button
                 onClick={() => sendMessageMutation.mutate()}
                 disabled={selectedChatId === null || sendMessageMutation.isPending}

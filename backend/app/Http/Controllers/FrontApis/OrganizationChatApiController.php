@@ -86,12 +86,20 @@ class OrganizationChatApiController extends Controller
                 ? ((int) $chat->user_id === (int) $auth->id ? $chat->peerUser : $chat->user)
                 : null;
             $last = $chat->messages->first();
+            $lastImage = $last?->getFirstMediaUrl('message_image') ?: null;
+            $lastVoice = $last?->getFirstMediaUrl('message_voice') ?: null;
+            $lastMessageText = trim((string) ($last?->message ?? ''));
+            if ($lastMessageText === '' && $lastVoice) {
+                $lastMessageText = 'Voice message';
+            } elseif ($lastMessageText === '' && $lastImage) {
+                $lastMessageText = 'Image';
+            }
             return [
                 'id' => $chat->id,
                 'target_type' => $isUserConversation ? 'user' : 'patient',
                 'target_id' => $isUserConversation ? ($peer?->id) : ($chat->patient?->id),
                 'title' => $isUserConversation ? ($peer?->name ?: 'Unknown user') : ($chat->patient?->name ?: 'Unknown patient'),
-                'last_message' => $last?->message,
+                'last_message' => $lastMessageText,
                 'updated_at' => optional($last?->created_at ?: $chat->updated_at)->format('Y-m-d H:i'),
                 'unread' => (int) Message::query()
                     ->where('chat_id', $chat->id)
@@ -166,6 +174,7 @@ class OrganizationChatApiController extends Controller
                 'is_mine' => (int) $m->sender_id === (int) $auth->id && $m->sender_type === User::class,
                 'message' => $m->message,
                 'image_url' => $m->getFirstMediaUrl('message_image') ?: null,
+                'voice_url' => $m->getFirstMediaUrl('message_voice') ?: null,
                 'seen' => (bool) $m->seen,
                 'created_at' => optional($m->created_at)->format('Y-m-d H:i:s'),
             ])
@@ -187,10 +196,15 @@ class OrganizationChatApiController extends Controller
         $validated = $request->validate([
             'message' => 'nullable|string|max:5000',
             'image' => 'nullable|file|max:10240',
+            'voice' => 'nullable|file|mimes:mp3,wav,m4a,aac,ogg,webm|max:20480',
         ]);
 
-        if (empty(trim((string) ($validated['message'] ?? ''))) && !$request->hasFile('image')) {
-            abort(422, 'Message text or image is required.');
+        if (
+            empty(trim((string) ($validated['message'] ?? '')))
+            && !$request->hasFile('image')
+            && !$request->hasFile('voice')
+        ) {
+            abort(422, 'Message text, image, or voice is required.');
         }
 
         $message = Message::create([
@@ -204,6 +218,9 @@ class OrganizationChatApiController extends Controller
         if ($request->hasFile('image')) {
             $message->addMedia($request->file('image'))->toMediaCollection('message_image');
         }
+        if ($request->hasFile('voice')) {
+            $message->addMedia($request->file('voice'))->toMediaCollection('message_voice');
+        }
 
         return $this->returnJSON([
             'id' => $message->id,
@@ -213,6 +230,7 @@ class OrganizationChatApiController extends Controller
             'is_mine' => true,
             'message' => $message->message,
             'image_url' => $message->getFirstMediaUrl('message_image') ?: null,
+            'voice_url' => $message->getFirstMediaUrl('message_voice') ?: null,
             'seen' => (bool) $message->seen,
             'created_at' => optional($message->created_at)->format('Y-m-d H:i:s'),
         ], 'Message sent', 'success');

@@ -563,6 +563,7 @@ const clinicItems: DashboardItem[] = [
   { label: "Clinic Management", labelKey: "clinic.menu.clinic_management", to: "/clinic-dashboard/clinic", icon: Stethoscope, permissionPrefixes: ["clinic"],
     children: [
   { label: "Services", labelKey: "clinic.menu.services", to: "/clinic-dashboard/services", icon: Stethoscope, permissionPrefixes: ["services"] },
+  { label: "Settings", labelKey: "clinic.menu.settings", to: "/clinic-dashboard/settings", icon: Settings, permissionPrefixes: ["settings"] },
   { label: "Inventory", labelKey: "clinic.menu.inventory", to: "/clinic-dashboard/inventory", icon: Boxes, permissionPrefixes: ["inventory"] },
   { label: "Reviews", labelKey: "clinic.menu.reviews", to: "/clinic-dashboard/reviews", icon: Star, permissionPrefixes: ["reviews"] },
   { label: "Announcements", labelKey: "clinic.menu.announcements", to: "/clinic-dashboard/announcements", icon: Bell, permissionPrefixes: ["announcements"] },
@@ -662,7 +663,8 @@ export function LabLayout() {
 // Radiology Dashboard
 const radioItems: DashboardItem[] = [
   { label: "Dashboard", labelKey: "radiology.menu.dashboard", to: "/radiology-dashboard", icon: LayoutDashboard },
-  { label: "Rays", labelKey: "radiology.menu.rays", to: "/radiology-dashboard/rays", icon: CalendarDays },
+  { label: "Rays", labelKey: "radiology.menu.rays", to: "/radiology-dashboard/rays", icon: CalendarDays, permissionPrefixes: ["rays"] },
+  { label: "Ray Categories", labelKey: "radiology.menu.ray_categories", to: "/radiology-dashboard/ray-categories", icon: Boxes, permissionPrefixes: ["ray-categories"] },
   { label: "Users", labelKey: "radiology.menu.users", to: "/radiology-dashboard/users", icon: UserCog, permissionPrefixes: ["users"] },
   { label: "Patients", labelKey: "radiology.menu.patients", to: "/radiology-dashboard/patients", icon: Users, permissionPrefixes: ["patients"] },
   { label: "Chat", to: "/radiology-dashboard/chat", icon: MessageCircle, permissionPrefixes: ["chat", "chats"] },

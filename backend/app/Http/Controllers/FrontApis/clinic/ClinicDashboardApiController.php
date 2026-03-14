@@ -20,6 +20,9 @@ use App\Models\ModuleService;
 use App\Models\Settings;
 use App\Models\Clinic;
 use App\Models\Specialty;
+use App\Models\Governorate;
+use App\Models\City;
+use App\Models\Area;
 use App\Models\Shared\OrganizationInventory;
 use App\Models\Shared\InventoryMovement;
 use Modules\Clinic\Chat\Models\Chat;
@@ -36,6 +39,8 @@ use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Illuminate\Support\Str;
 
 /**
  * Front API: Clinic dashboard pages (JSON for React frontend)
@@ -412,6 +417,14 @@ class ClinicDashboardApiController extends Controller
             'payment' => $reservation->payment ?? 'not_paid',
             'cost' => (float) ($reservation->cost ?? 0),
             'month' => $reservation->month ?? null,
+            'first_diagnosis' => $reservation->first_diagnosis,
+            'final_diagnosis' => $reservation->final_diagnosis,
+            'voice_records' => $reservation->getMedia('reservation_voice_records')->map(fn ($media) => [
+                'id' => $media->id,
+                'url' => $media->getUrl(),
+                'file_name' => $media->file_name,
+                'size' => $media->size,
+            ])->values(),
             'services' => $reservation->Services->map(fn ($sf) => [
                 'id' => $sf->id,
                 'service_fee_id' => $sf->service_fee_id,
@@ -522,6 +535,13 @@ class ClinicDashboardApiController extends Controller
         $this->ensureClinicAuth();
         $clinicId = request()->user()->organization->id ?? null;
 
+        if ($request->has('services') && is_string($request->input('services'))) {
+            $decodedServices = json_decode((string) $request->input('services'), true);
+            if (is_array($decodedServices)) {
+                $request->merge(['services' => $decodedServices]);
+            }
+        }
+
         $validated = $request->validate([
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'required|exists:doctors,id',
@@ -533,10 +553,14 @@ class ClinicDashboardApiController extends Controller
             'acceptance' => 'required|in:pending,approved,not_approved',
             'payment' => 'required|in:paid,not_paid,unpaid',
             'month' => 'nullable|string|max:2',
+            'first_diagnosis' => 'nullable|string|max:5000',
+            'final_diagnosis' => 'nullable|string|max:5000',
             'services' => 'nullable|array',
             'services.*.service_fee_id' => 'required_with:services|exists:services,id',
             'services.*.fee' => 'nullable|numeric|min:0',
             'services.*.notes' => 'nullable|string|max:1000',
+            'voice_records' => 'nullable|array',
+            'voice_records.*' => 'file|mimes:mp3,wav,m4a,aac,ogg,webm|max:20480',
         ]);
 
         $mode = $this->resolveReservationMode((int) $clinicId);
@@ -564,6 +588,8 @@ class ClinicDashboardApiController extends Controller
             'acceptance' => $validated['acceptance'],
             'month' => $validated['month'] ?? Carbon::parse($validated['date'])->format('m'),
             'slot' => $mode === 'slots' ? $selectedValue : null,
+            'first_diagnosis' => $validated['first_diagnosis'] ?? null,
+            'final_diagnosis' => $validated['final_diagnosis'] ?? null,
         ]);
 
         $sum = 0;
@@ -579,6 +605,12 @@ class ClinicDashboardApiController extends Controller
             $sum += $fee;
         }
         $reservation->update(['cost' => $sum]);
+
+        if ($request->hasFile('voice_records')) {
+            foreach ($request->file('voice_records') as $voiceFile) {
+                $reservation->addMedia($voiceFile)->toMediaCollection('reservation_voice_records');
+            }
+        }
 
         // Notify clinic dashboard users about newly created reservation.
         $clinicUsers = User::query()
@@ -602,6 +634,20 @@ class ClinicDashboardApiController extends Controller
         $clinicId = request()->user()->organization->id ?? null;
         $reservation = Reservation::where('clinic_id', $clinicId)->findOrFail($id);
 
+        if ($request->has('services') && is_string($request->input('services'))) {
+            $decodedServices = json_decode((string) $request->input('services'), true);
+            if (is_array($decodedServices)) {
+                $request->merge(['services' => $decodedServices]);
+            }
+        }
+
+        if ($request->has('remove_voice_record_ids') && is_string($request->input('remove_voice_record_ids'))) {
+            $decodedVoiceIds = json_decode((string) $request->input('remove_voice_record_ids'), true);
+            if (is_array($decodedVoiceIds)) {
+                $request->merge(['remove_voice_record_ids' => $decodedVoiceIds]);
+            }
+        }
+
         $validated = $request->validate([
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'required|exists:doctors,id',
@@ -613,10 +659,16 @@ class ClinicDashboardApiController extends Controller
             'acceptance' => 'required|in:pending,approved,not_approved',
             'payment' => 'required|in:paid,not_paid,unpaid',
             'month' => 'nullable|string|max:2',
+            'first_diagnosis' => 'nullable|string|max:5000',
+            'final_diagnosis' => 'nullable|string|max:5000',
             'services' => 'nullable|array',
             'services.*.service_fee_id' => 'required_with:services|exists:services,id',
             'services.*.fee' => 'nullable|numeric|min:0',
             'services.*.notes' => 'nullable|string|max:1000',
+            'voice_records' => 'nullable|array',
+            'voice_records.*' => 'file|mimes:mp3,wav,m4a,aac,ogg,webm|max:20480',
+            'remove_voice_record_ids' => 'nullable|array',
+            'remove_voice_record_ids.*' => 'integer',
         ]);
 
         $mode = $this->resolveReservationMode((int) $clinicId);
@@ -643,6 +695,8 @@ class ClinicDashboardApiController extends Controller
             'month' => $validated['month'] ?? Carbon::parse($validated['date'])->format('m'),
             'reservation_number' => $mode === 'numbers' ? $selectedValue : null,
             'slot' => $mode === 'slots' ? $selectedValue : null,
+            'first_diagnosis' => $validated['first_diagnosis'] ?? null,
+            'final_diagnosis' => $validated['final_diagnosis'] ?? null,
         ]);
 
         ModuleService::where('module_id', $reservation->id)
@@ -662,6 +716,21 @@ class ClinicDashboardApiController extends Controller
             $sum += $fee;
         }
         $reservation->update(['cost' => $sum]);
+
+        $removeIds = collect($validated['remove_voice_record_ids'] ?? [])->map(fn ($v) => (int) $v)->filter()->values();
+        if ($removeIds->isNotEmpty()) {
+            $reservation->media()
+                ->where('collection_name', 'reservation_voice_records')
+                ->whereIn('id', $removeIds->all())
+                ->get()
+                ->each(fn (Media $media) => $media->delete());
+        }
+
+        if ($request->hasFile('voice_records')) {
+            foreach ($request->file('voice_records') as $voiceFile) {
+                $reservation->addMedia($voiceFile)->toMediaCollection('reservation_voice_records');
+            }
+        }
 
         return $this->returnJSON(['id' => $reservation->id], 'Reservation updated', 'success');
     }
@@ -2246,6 +2315,171 @@ class ClinicDashboardApiController extends Controller
         ]);
 
         return $this->returnJSON(['id' => $service->id], 'Service updated', 'success');
+    }
+
+    /**
+     * Clinic settings/details for dashboard profile page.
+     */
+    public function clinicSettings()
+    {
+        $this->ensureClinicAuth();
+
+        $authUser = request()->user();
+        $clinic = Clinic::query()->findOrFail((int) $authUser->organization_id);
+        $logoPath = trim((string) ($clinic->logo ?? ''));
+        $logoUrl = null;
+        if ($logoPath !== '') {
+            $logoUrl = Str::startsWith($logoPath, ['http://', 'https://']) ? $logoPath : asset($logoPath);
+        }
+
+        $governorates = Governorate::query()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($item) => ['id' => (int) $item->id, 'name' => $item->name])
+            ->values();
+
+        $cities = City::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'governorate_id'])
+            ->map(fn ($item) => [
+                'id' => (int) $item->id,
+                'name' => $item->name,
+                'governorate_id' => (int) $item->governorate_id,
+            ])
+            ->values();
+
+        $areas = Area::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'city_id', 'governorate_id'])
+            ->map(fn ($item) => [
+                'id' => (int) $item->id,
+                'name' => $item->name,
+                'city_id' => (int) $item->city_id,
+                'governorate_id' => (int) $item->governorate_id,
+            ])
+            ->values();
+
+        $specialties = Specialty::query()
+            ->orderBy('id')
+            ->get(['id', 'name_en', 'name_ar'])
+            ->map(fn ($item) => [
+                'id' => (int) $item->id,
+                'name' => $item->name_en ?: $item->name_ar,
+                'name_en' => $item->name_en,
+                'name_ar' => $item->name_ar,
+            ])
+            ->values();
+
+        return $this->returnJSON([
+            'id' => $clinic->id,
+            'name' => $clinic->name,
+            'email' => $clinic->email,
+            'phone' => $clinic->phone,
+            'address' => $clinic->address,
+            'description' => $clinic->description,
+            'website' => $clinic->website,
+            'logo' => $clinic->logo,
+            'logo_url' => $logoUrl,
+            'governorate_id' => $clinic->governorate_id ? (int) $clinic->governorate_id : null,
+            'city_id' => $clinic->city_id ? (int) $clinic->city_id : null,
+            'area_id' => $clinic->area_id ? (int) $clinic->area_id : null,
+            'specialty_id' => $clinic->specialty_id ? (int) $clinic->specialty_id : null,
+            'governorates' => $governorates,
+            'cities' => $cities,
+            'areas' => $areas,
+            'specialties' => $specialties,
+        ], 'Clinic settings', 'success');
+    }
+
+    /**
+     * Update clinic settings/details (including logo upload).
+     */
+    public function updateClinicSettings(Request $request)
+    {
+        $this->ensureClinicAuth();
+
+        $authUser = request()->user();
+        $clinic = Clinic::query()->findOrFail((int) $authUser->organization_id);
+
+        foreach (['governorate_id', 'city_id', 'area_id', 'specialty_id'] as $field) {
+            if ($request->has($field) && trim((string) $request->input($field)) === '') {
+                $request->merge([$field => null]);
+            }
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255|unique:clinics,email,' . $clinic->id,
+            'phone' => 'nullable|string|max:30',
+            'address' => 'nullable|string|max:1000',
+            'description' => 'nullable|string|max:5000',
+            'website' => 'nullable|url|max:255',
+            'governorate_id' => 'nullable|integer|exists:governorates,id',
+            'city_id' => 'nullable|integer|exists:cities,id',
+            'area_id' => 'nullable|integer|exists:areas,id',
+            'specialty_id' => 'nullable|integer|exists:specialties,id',
+            'logo' => 'nullable|image|max:4096',
+        ]);
+
+        $payload = [
+            'name' => $validated['name'],
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'website' => $validated['website'] ?? null,
+            'governorate_id' => $validated['governorate_id'] ?? null,
+            'city_id' => $validated['city_id'] ?? null,
+            'area_id' => $validated['area_id'] ?? null,
+            'specialty_id' => $validated['specialty_id'] ?? null,
+        ];
+
+        if ($request->hasFile('logo')) {
+            $logoFile = $request->file('logo');
+            $directory = public_path('uploads/clinic-logos');
+            if (!is_dir($directory)) {
+                @mkdir($directory, 0755, true);
+            }
+
+            $filename = 'clinic-' . $clinic->id . '-' . time() . '.' . $logoFile->getClientOriginalExtension();
+            $logoFile->move($directory, $filename);
+            $newLogoPath = 'uploads/clinic-logos/' . $filename;
+
+            $oldLogo = trim((string) ($clinic->logo ?? ''));
+            if ($oldLogo !== '' && !Str::startsWith($oldLogo, ['http://', 'https://'])) {
+                $oldFullPath = public_path($oldLogo);
+                if (is_file($oldFullPath)) {
+                    @unlink($oldFullPath);
+                }
+            }
+
+            $payload['logo'] = $newLogoPath;
+        }
+
+        $clinic->update($payload);
+        $clinic->refresh();
+
+        $logoPath = trim((string) ($clinic->logo ?? ''));
+        $logoUrl = null;
+        if ($logoPath !== '') {
+            $logoUrl = Str::startsWith($logoPath, ['http://', 'https://']) ? $logoPath : asset($logoPath);
+        }
+
+        return $this->returnJSON([
+            'id' => $clinic->id,
+            'name' => $clinic->name,
+            'email' => $clinic->email,
+            'phone' => $clinic->phone,
+            'address' => $clinic->address,
+            'description' => $clinic->description,
+            'website' => $clinic->website,
+            'logo' => $clinic->logo,
+            'logo_url' => $logoUrl,
+            'governorate_id' => $clinic->governorate_id ? (int) $clinic->governorate_id : null,
+            'city_id' => $clinic->city_id ? (int) $clinic->city_id : null,
+            'area_id' => $clinic->area_id ? (int) $clinic->area_id : null,
+            'specialty_id' => $clinic->specialty_id ? (int) $clinic->specialty_id : null,
+        ], 'Clinic settings updated', 'success');
     }
 
     /**

@@ -55,6 +55,7 @@ import ClinicModules from "@/pages/clinic/ClinicModules";
 import ClinicInventory from "@/pages/clinic/ClinicInventory";
 import ClinicFinancial from "@/pages/clinic/ClinicFinancial";
 import ClinicNotifications from "@/pages/clinic/ClinicNotifications";
+import ClinicSettings from "@/pages/clinic/ClinicSettings";
 import OrganizationChatPage from "@/pages/shared/OrganizationChatPage";
 
 // Admin pages
@@ -92,6 +93,7 @@ import RadiologyFinancial from "@/pages/radiology/RadiologyFinancial";
 import RadiologyNotifications from "@/pages/radiology/RadiologyNotifications";
 import RadiologyUsers from "@/pages/radiology/RadiologyUsers";
 import RadiologyPatientHistoryPage from "@/pages/radiology/RadiologyPatientHistoryPage";
+import RadiologyRayCategories from "@/pages/radiology/RadiologyRayCategories";
 
 // Auth pages
 import LoginPage from "@/pages/auth/LoginPage";
@@ -106,10 +108,16 @@ import RadiologyRegisterPage from "@/pages/auth/RadiologyRegisterPage";
 // Shared
 import PlaceholderPage from "@/components/PlaceholderPage";
 import NotFound from "@/pages/NotFound";
+import GlobalLoadingIndicator from "@/components/GlobalLoadingIndicator";
 
 import { FileText, FlaskConical, ScanLine, Heart, Glasses, Star, CalendarDays, Users, Shield, Trash2, Hash, Clock, MapPin, Bell } from "lucide-react";
+import { QUERY_CACHE_DEFAULTS } from "@/lib/queryCache";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: QUERY_CACHE_DEFAULTS,
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -118,6 +126,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          {/* <GlobalLoadingIndicator /> */}
           <Routes>
             {/* Auth (no layout) */}
             <Route path="/login" element={<RequireGuest><LoginPage /></RequireGuest>} />
@@ -180,6 +189,7 @@ const App = () => (
             <Route path="/clinic-dashboard/users" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["users"]}><ClinicUsers /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/services" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["services"]}><ClinicServices /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/inventory" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["inventory"]}><ClinicInventory /></RequireOrganizationAccess>} />
+            <Route path="/clinic-dashboard/settings" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["settings"]}><ClinicSettings /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/modules" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["modules"]}><ClinicModules /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/financial" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["financial"]}><ClinicFinancial /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/trash" element={<PlaceholderPage title="Trash" description="Restore or permanently delete reservations" icon={Trash2} />} />
@@ -221,7 +231,8 @@ const App = () => (
           {/* Radiology Dashboard */}
           <Route element={<RequireOrganizationAccess allowedGuards={["radiology_center"]}><RadiologyLayout /></RequireOrganizationAccess>}>
             <Route path="/radiology-dashboard" element={<RadiologyDashboard />} />
-            <Route path="/radiology-dashboard/rays" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]}><RadiologyRays /></RequireOrganizationAccess>} />
+            <Route path="/radiology-dashboard/rays" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["rays"]}><RadiologyRays /></RequireOrganizationAccess>} />
+            <Route path="/radiology-dashboard/ray-categories" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["ray-categories"]}><RadiologyRayCategories /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/users" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["users"]}><RadiologyUsers /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/patients" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["patients"]}><RadiologyPatients /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/patients/:id/history" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["patients"]}><RadiologyPatientHistoryPage /></RequireOrganizationAccess>} />

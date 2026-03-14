@@ -482,36 +482,45 @@ export const clinicApi = {
 	reservation: (id: string | number, token?: string | null) =>
 		request(`/clinic/reservations/${id}`, { token: token ?? getOrganizationToken() ?? undefined }),
 	createReservation: (
-		data: {
-			patient_id: number;
-			doctor_id: number;
-			date: string;
-			time?: string | null;
-			reservation_number?: string | null;
-			slot?: string | null;
-			status?: "waiting" | "entered" | "finished" | "cancelled";
-			acceptance: "pending" | "approved" | "not_approved";
-			payment: "paid" | "not_paid" | "unpaid";
-			month?: string;
-			services?: Array<{ service_fee_id: number; fee?: number; notes?: string }>;
-		},
+		data:
+			| {
+					patient_id: number;
+					doctor_id: number;
+					date: string;
+					time?: string | null;
+					reservation_number?: string | null;
+					slot?: string | null;
+					status?: "waiting" | "entered" | "finished" | "cancelled";
+					acceptance: "pending" | "approved" | "not_approved";
+					payment: "paid" | "not_paid" | "unpaid";
+					month?: string;
+					first_diagnosis?: string | null;
+					final_diagnosis?: string | null;
+					services?: Array<{ service_fee_id: number; fee?: number; notes?: string }>;
+			  }
+			| FormData,
 		token?: string | null,
 	) => request("/clinic/reservations", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
 	updateReservation: (
 		id: string | number,
-		data: {
-			patient_id: number;
-			doctor_id: number;
-			date: string;
-			time?: string | null;
-			reservation_number?: string | null;
-			slot?: string | null;
-			status?: "waiting" | "entered" | "finished" | "cancelled";
-			acceptance: "pending" | "approved" | "not_approved";
-			payment: "paid" | "not_paid" | "unpaid";
-			month?: string;
-			services?: Array<{ service_fee_id: number; fee?: number; notes?: string }>;
-		},
+		data:
+			| {
+					patient_id: number;
+					doctor_id: number;
+					date: string;
+					time?: string | null;
+					reservation_number?: string | null;
+					slot?: string | null;
+					status?: "waiting" | "entered" | "finished" | "cancelled";
+					acceptance: "pending" | "approved" | "not_approved";
+					payment: "paid" | "not_paid" | "unpaid";
+					month?: string;
+					first_diagnosis?: string | null;
+					final_diagnosis?: string | null;
+					remove_voice_record_ids?: number[];
+					services?: Array<{ service_fee_id: number; fee?: number; notes?: string }>;
+			  }
+			| FormData,
 		token?: string | null,
 	) => request(`/clinic/reservations/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
 	reservationPrescription: (id: string | number, token?: string | null) =>
@@ -787,6 +796,33 @@ export const clinicApi = {
 		},
 		token?: string | null,
 	) => request(`/clinic/services/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	settings: (token?: string | null) =>
+		request("/clinic/settings", { token: token ?? getOrganizationToken() ?? undefined }),
+	updateSettings: (
+		data:
+			| {
+					name: string;
+					email?: string | null;
+					phone?: string | null;
+					address?: string | null;
+					description?: string | null;
+					website?: string | null;
+					governorate_id?: number | null;
+					city_id?: number | null;
+					area_id?: number | null;
+					specialty_id?: number | null;
+			  }
+			| FormData,
+		token?: string | null,
+	) => {
+		// Laravel may not reliably parse multipart form data on raw PUT requests.
+		// Use POST + _method override when FormData is provided.
+		if (typeof FormData !== "undefined" && data instanceof FormData) {
+			data.set("_method", "PUT");
+			return request("/clinic/settings", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined });
+		}
+		return request("/clinic/settings", { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined });
+	},
 	modules: (token?: string | null) =>
 		request("/clinic/modules", { token: token ?? getOrganizationToken() ?? undefined }),
 	inventoryCategories: (token?: string | null) =>
@@ -813,6 +849,29 @@ export const radiologyApi = {
 		const q = params ? "?" + new URLSearchParams(params).toString() : "";
 		return request(`/radiologyCenter/rays${q}`, { token: token ?? getOrganizationToken() ?? undefined });
 	},
+	rayCategories: (params?: Record<string, string>, token?: string | null) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/radiologyCenter/ray-categories${q}`, { token: token ?? getOrganizationToken() ?? undefined });
+	},
+	rayCategory: (id: string | number, token?: string | null) =>
+		request(`/radiologyCenter/ray-categories/${id}`, { token: token ?? getOrganizationToken() ?? undefined }),
+	createRayCategory: (
+		data: {
+			name: string;
+			description?: string | null;
+		},
+		token?: string | null,
+	) => request("/radiologyCenter/ray-categories", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	updateRayCategory: (
+		id: string | number,
+		data: {
+			name: string;
+			description?: string | null;
+		},
+		token?: string | null,
+	) => request(`/radiologyCenter/ray-categories/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	deleteRayCategory: (id: string | number, token?: string | null) =>
+		request(`/radiologyCenter/ray-categories/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
 	ray: (id: string | number, token?: string | null) =>
 		request(`/radiologyCenter/rays/${id}`, { token: token ?? getOrganizationToken() ?? undefined }),
 	createRay: (
