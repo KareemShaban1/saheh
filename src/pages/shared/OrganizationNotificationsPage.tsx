@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { clinicApi, labApi, radiologyApi } from "@/lib/api";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type Scope = "clinic" | "lab" | "radiology";
 
@@ -140,6 +141,7 @@ const scopeLabel: Record<Scope, string> = {
 };
 
 export default function OrganizationNotificationsPage({ scope }: { scope: Scope }) {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | NotificationType>("all");
   const [priorityFilter, setPriorityFilter] = useState<"all" | Priority>("all");
@@ -202,17 +204,15 @@ export default function OrganizationNotificationsPage({ scope }: { scope: Scope 
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">{scopeLabel[scope]} Notifications</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            Multi-type notifications for appointments, payments, completion, and updates.
-          </p>
+          <h2 className="text-2xl font-bold">{scopeLabel[scope]} {t("notifications.title")}</h2>
+         
         </div>
         <Button
           variant="outline"
           onClick={() => setReadIds(new Set(notifications.map((item) => item.id)))}
           disabled={notifications.length === 0 || unreadCount === 0}
         >
-          Mark All as Read ({unreadCount})
+          {t("notifications.mark_all_as_read")} ({unreadCount})
         </Button>
       </div>
 
@@ -221,34 +221,34 @@ export default function OrganizationNotificationsPage({ scope }: { scope: Scope 
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-10"
-            placeholder="Search notifications..."
+            placeholder={t("notifications.search")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as "all" | NotificationType)}>
           <SelectTrigger>
-            <SelectValue placeholder="Type" />
+            <SelectValue placeholder={t("notifications.type")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="new_appointment">New Appointment</SelectItem>
-            <SelectItem value="pending_reservation">Pending Reservation</SelectItem>
-            <SelectItem value="cancelled_reservation">Cancelled</SelectItem>
-            <SelectItem value="payment_pending">Payment Pending</SelectItem>
-            <SelectItem value="service_completed">Completed</SelectItem>
-            <SelectItem value="announcement">Announcement</SelectItem>
+            <SelectItem value="all">{t("notifications.all_types")}</SelectItem>
+            <SelectItem value="new_appointment">{t("notifications.new_appointment")}</SelectItem>
+            <SelectItem value="pending_reservation">{t("notifications.pending_reservation")}</SelectItem>
+            <SelectItem value="cancelled_reservation">{t("notifications.cancelled_reservation")}</SelectItem>
+            <SelectItem value="payment_pending">{t("notifications.payment_pending")}</SelectItem>
+            <SelectItem value="service_completed">{t("notifications.service_completed")}</SelectItem>
+            <SelectItem value="announcement">{t("notifications.announcement")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={priorityFilter} onValueChange={(value) => setPriorityFilter(value as "all" | Priority)}>
           <SelectTrigger>
-            <SelectValue placeholder="Priority" />
+            <SelectValue placeholder={t("notifications.priority")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Priorities</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="all">{t("notifications.all_priorities")}</SelectItem>
+            <SelectItem value="high">{t("notifications.high")}</SelectItem>
+            <SelectItem value="medium">{t("notifications.medium")}</SelectItem>
+            <SelectItem value="low">{t("notifications.low")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -256,10 +256,10 @@ export default function OrganizationNotificationsPage({ scope }: { scope: Scope 
       <div className="mb-4 max-w-xs">
         <Select value={moduleFilter} onValueChange={setModuleFilter}>
           <SelectTrigger>
-            <SelectValue placeholder="Module" />
+            <SelectValue placeholder={t("notifications.module")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Modules</SelectItem>
+            <SelectItem value="all">{t("notifications.all_modules")}</SelectItem>
             {availableModules.map((moduleName) => (
               <SelectItem key={moduleName} value={moduleName}>
                 {moduleName.replaceAll("_", " ")}
@@ -271,20 +271,20 @@ export default function OrganizationNotificationsPage({ scope }: { scope: Scope 
 
       <div className="mb-4">
         <Button variant={showUnreadOnly ? "default" : "outline"} size="sm" onClick={() => setShowUnreadOnly((prev) => !prev)}>
-          {showUnreadOnly ? "Showing Unread Only" : "Show Unread Only"}
+          {showUnreadOnly ? t("notifications.showing_unread_only") : t("notifications.show_unread_only")}
         </Button>
       </div>
 
       <div className="bg-card rounded-xl border shadow-card overflow-hidden">
         <div className="divide-y">
-          {isLoading && <div className="p-4 text-muted-foreground text-sm">Loading notifications...</div>}
+          {isLoading && <div className="p-4 text-muted-foreground text-sm">{t("notifications.loading_notifications")}</div>}
           {hasBlockingError && (
             <div className="p-4 text-destructive text-sm">
-              {feedQuery.error instanceof Error ? feedQuery.error.message : "Failed to load notifications"}
+              {feedQuery.error instanceof Error ? feedQuery.error.message : t("notifications.failed_to_load_notifications")}
             </div>
           )}
           {!isLoading && !hasBlockingError && filtered.length === 0 && (
-            <div className="p-4 text-muted-foreground text-sm">No notifications found.</div>
+            <div className="p-4 text-muted-foreground text-sm">{t("notifications.no_notifications_found")}</div>
           )}
           {filtered.map((item) => {
             const unread = !item.isRead && !readIds.has(item.id);
@@ -305,14 +305,14 @@ export default function OrganizationNotificationsPage({ scope }: { scope: Scope 
                     <Badge variant="secondary" className={typeStyles[item.type]}>{typeLabels[item.type]}</Badge>
                     <Badge variant="secondary" className={priorityStyles[item.priority]}>{item.priority}</Badge>
                     <Badge variant="outline">{item.module.replaceAll("_", " ")}</Badge>
-                    {unread && <Badge variant="secondary" className="bg-primary/10 text-primary">Unread</Badge>}
+                    {unread && <Badge variant="secondary" className="bg-primary/10 text-primary">{t("notifications.unread")}</Badge>}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{item.message}</p>
                   <p className="text-xs text-muted-foreground mt-1">{new Date(item.timestamp).toLocaleString()}</p>
                 </div>
                 {unread && (
                   <Button variant="ghost" size="sm" onClick={() => setReadIds((prev) => new Set(prev).add(item.id))}>
-                    Mark Read
+                    {t("notifications.mark_read")}
                   </Button>
                 )}
               </div>

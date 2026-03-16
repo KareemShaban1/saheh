@@ -1,7 +1,16 @@
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Building2, Users, CalendarDays, Heart, ArrowRight, Search, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const stats = [
   { label: "Clinics", value: "2,400+", icon: Building2, color: "text-primary" },
@@ -17,8 +26,40 @@ const featuredClinics = [
 ];
 
 export default function HomePage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const registrationMessage = (location.state as { registrationMessage?: string } | null)?.registrationMessage;
+  const showRegistrationModal = Boolean((location.state as { registrationSuccess?: boolean } | null)?.registrationSuccess);
+  const [open, setOpen] = useState(showRegistrationModal);
+
+  useEffect(() => {
+    setOpen(showRegistrationModal);
+  }, [showRegistrationModal]);
+
+  const handleModalOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen && showRegistrationModal) {
+      navigate(location.pathname, { replace: true });
+    }
+  };
+
   return (
     <div>
+      <Dialog open={open} onOpenChange={handleModalOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registration submitted successfully</DialogTitle>
+            <DialogDescription>
+              {registrationMessage || "Your organization registration is pending review."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => handleModalOpenChange(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 gradient-hero opacity-[0.07]" />

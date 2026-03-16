@@ -17,7 +17,8 @@ type ClinicRow = {
   address?: string | null;
   website?: string | null;
   description?: string | null;
-  status: number;
+  status: "pending" | "approved" | "rejected";
+  is_active: number;
   users_count?: number;
   doctors_count?: number;
   patients_count?: number;
@@ -28,7 +29,10 @@ export default function AdminClinics() {
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [activeClinicId, setActiveClinicId] = useState<string | number | null>(null);
+  const [statusTarget, setStatusTarget] = useState<ClinicRow | null>(null);
+  const [statusDraft, setStatusDraft] = useState<ClinicRow["status"]>("pending");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -36,7 +40,8 @@ export default function AdminClinics() {
     address: "",
     website: "",
     description: "",
-    status: "active" as "active" | "inactive",
+    status: "approved" as ClinicRow["status"],
+    is_active: true,
   });
 
   const { data, isLoading, error } = useQuery({
@@ -49,7 +54,8 @@ export default function AdminClinics() {
     return ((root as { data?: Array<Record<string, unknown>> })?.data ?? []).map((clinic) => ({
       id: String(clinic.id ?? "—"),
       name: String(clinic.name ?? "—"),
-      status: Number(clinic.status ?? 1),
+      status: String(clinic.status ?? "pending") as ClinicRow["status"],
+      is_active: Number(clinic.is_active ?? 0),
       users_count: Number(clinic.users_count ?? 0),
       doctors_count: Number(clinic.doctors_count ?? 0),
       patients_count: Number(clinic.patients_count ?? 0),
@@ -72,12 +78,13 @@ export default function AdminClinics() {
         website: form.website.trim() || null,
         description: form.description.trim() || null,
         status: form.status,
+        is_active: form.is_active,
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "clinics"] });
       toast({ title: "Clinic created successfully" });
       setCreateOpen(false);
-      setForm({ name: "", email: "", phone: "", address: "", website: "", description: "", status: "active" });
+      setForm({ name: "", email: "", phone: "", address: "", website: "", description: "", status: "approved", is_active: true });
     },
     onError: (e) =>
       toast({
@@ -88,14 +95,32 @@ export default function AdminClinics() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string | number; status: "active" | "inactive" }) => adminApi.updateClinicStatus(id, status),
+    mutationFn: ({ id, status }: { id: string | number; status: ClinicRow["status"] }) =>
+      adminApi.updateClinicStatus(id, { status }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "clinics"] });
       toast({ title: "Clinic status updated" });
+      setStatusModalOpen(false);
+      setStatusTarget(null);
     },
     onError: (e) =>
       toast({
         title: "Failed to update status",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      }),
+  });
+
+  const activeMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: string | number; is_active: boolean }) =>
+      adminApi.updateClinicStatus(id, { is_active }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "clinics"] });
+      toast({ title: "Clinic activation updated" });
+    },
+    onError: (e) =>
+      toast({
+        title: "Failed to update activation",
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       }),
@@ -120,9 +145,10 @@ export default function AdminClinics() {
     setDetailsOpen(true);
   };
 
-  const toggleStatus = (row: ClinicRow) => {
-    const next = row.status === 1 ? "inactive" : "active";
-    statusMutation.mutate({ id: row.id, status: next });
+  const openStatusModal = (row: ClinicRow) => {
+    setStatusTarget(row);
+    setStatusDraft(row.status);
+    setStatusModalOpen(true);
   };
 
   const deleteClinic = (row: ClinicRow) => {
@@ -165,6 +191,7 @@ export default function AdminClinics() {
                   <th className="text-start font-medium p-4 text-muted-foreground">Doctors</th>
                   <th className="text-start font-medium p-4 text-muted-foreground">Patients</th>
                   <th className="text-start font-medium p-4 text-muted-foreground">Status</th>
+                  <th className="text-start font-medium p-4 text-muted-foreground">Is Active</th>
                   <th className="text-start font-medium p-4 text-muted-foreground">Actions</th>
                 </tr>
               </thead>
@@ -177,17 +204,50 @@ export default function AdminClinics() {
                     <td className="p-4">{row.doctors_count ?? 0}</td>
                     <td className="p-4">{row.patients_count ?? 0}</td>
                     <td className="p-4">
-                      <Badge variant="secondary" className={row.status === 1 ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}>
-                        {row.status === 1 ? "active" : "inactive"}
+                      <Badge
+                        variant="secondary"
+                        className={
+                          row.status === "approved"
+                            ? "bg-success/10 text-success"
+                            : row.status === "rejected"
+                              ? "bg-destructive/10 text-destructive"
+                              : "bg-warning/10 text-warning"
+                        }
+                      >
+                        {row.status}
                       </Badge>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <label className="inline-flex items-center gap-1 text-xs">
+                          <input
+                            type="radio"
+                            name={`is-active-${row.id}`}
+                            checked={row.is_active === 1}
+                            onChange={() => activeMutation.mutate({ id: row.id, is_active: true })}
+                            disabled={activeMutation.isPending}
+                          />
+                          Active
+                        </label>
+                        <label className="inline-flex items-center gap-1 text-xs">
+                          <input
+                            type="radio"
+                            name={`is-active-${row.id}`}
+                            checked={row.is_active !== 1}
+                            onChange={() => activeMutation.mutate({ id: row.id, is_active: false })}
+                            disabled={activeMutation.isPending}
+                          />
+                          Inactive
+                        </label>
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" onClick={() => openDetails(row.id)}>
                           Show
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => toggleStatus(row)} disabled={statusMutation.isPending}>
-                          {row.status === 1 ? "Deactivate" : "Activate"}
+                        <Button variant="outline" size="sm" onClick={() => openStatusModal(row)} disabled={statusMutation.isPending}>
+                          Change Status
                         </Button>
                         <Button variant="destructive" size="sm" onClick={() => deleteClinic(row)} disabled={deleteMutation.isPending}>
                           Delete
@@ -198,7 +258,7 @@ export default function AdminClinics() {
                 ))}
                 {rows.length === 0 ? (
                   <tr>
-                    <td className="p-4 text-muted-foreground" colSpan={7}>No clinics found.</td>
+                    <td className="p-4 text-muted-foreground" colSpan={8}>No clinics found.</td>
                   </tr>
                 ) : null}
               </tbody>
@@ -246,11 +306,35 @@ export default function AdminClinics() {
                 title="Clinic status"
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                 value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "active" | "inactive" }))}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ClinicRow["status"] }))}
               >
-                <option value="active">active</option>
-                <option value="inactive">inactive</option>
+                <option value="pending">pending</option>
+                <option value="approved">approved</option>
+                <option value="rejected">rejected</option>
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Is Active</Label>
+              <div className="flex items-center gap-5">
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="create-is-active"
+                    checked={form.is_active}
+                    onChange={() => setForm((f) => ({ ...f, is_active: true }))}
+                  />
+                  Active
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="create-is-active"
+                    checked={!form.is_active}
+                    onChange={() => setForm((f) => ({ ...f, is_active: false }))}
+                  />
+                  Inactive
+                </label>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -284,7 +368,8 @@ export default function AdminClinics() {
                     <p><span className="font-medium">Address:</span> {String(row.address ?? "—")}</p>
                     <p><span className="font-medium">Website:</span> {String(row.website ?? "—")}</p>
                     <p><span className="font-medium">Description:</span> {String(row.description ?? "—")}</p>
-                    <p><span className="font-medium">Status:</span> {Number(row.status ?? 1) === 1 ? "active" : "inactive"}</p>
+                    <p><span className="font-medium">Status:</span> {String(row.status ?? "pending")}</p>
+                    <p><span className="font-medium">Is Active:</span> {Number(row.is_active ?? 0) === 1 ? "active" : "inactive"}</p>
                     <p><span className="font-medium">Users:</span> {String(row.users_count ?? 0)}</p>
                     <p><span className="font-medium">Doctors:</span> {String(row.doctors_count ?? 0)}</p>
                     <p><span className="font-medium">Patients:</span> {String(row.patients_count ?? 0)}</p>
@@ -295,6 +380,40 @@ export default function AdminClinics() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailsOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Clinic Status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="change-clinic-status">Status</Label>
+            <select
+              id="change-clinic-status"
+              title="Change clinic status"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={statusDraft}
+              onChange={(e) => setStatusDraft(e.target.value as ClinicRow["status"])}
+            >
+              <option value="pending">pending</option>
+              <option value="approved">approved</option>
+              <option value="rejected">rejected</option>
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusModalOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!statusTarget) return;
+                statusMutation.mutate({ id: statusTarget.id, status: statusDraft });
+              }}
+              disabled={statusMutation.isPending || !statusTarget}
+            >
+              {statusMutation.isPending ? "Saving..." : "Save"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

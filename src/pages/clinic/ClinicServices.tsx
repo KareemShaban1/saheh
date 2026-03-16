@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type ServiceRow = {
   id: string | number;
@@ -26,6 +27,7 @@ type DoctorOption = {
 };
 
 export default function ClinicServices() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [dialogMode, setDialogMode] = useState<"add" | "edit" | "show" | null>(null);
@@ -69,7 +71,7 @@ export default function ClinicServices() {
       clinicApi.createService(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clinic", "services"] });
-      toast({ title: "Service added" });
+      toast({ title: t("clinic.services.service_added") });
       setDialogMode(null);
     },
     onError: (err: unknown) => {
@@ -82,7 +84,7 @@ export default function ClinicServices() {
       clinicApi.updateService(args.id, args.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clinic", "services"] });
-      toast({ title: "Service updated" });
+      toast({ title: t("clinic.services.service_updated") });
       setDialogMode(null);
     },
     onError: (err: unknown) => {
@@ -127,13 +129,13 @@ export default function ClinicServices() {
 
   const onSave = () => {
     if (!form.service_name.trim()) {
-      toast({ title: "Service name is required", variant: "destructive" });
+      toast({ title: t("clinic.services.service_name_is_required"), variant: "destructive" });
       return;
     }
 
     const parsedPrice = Number(form.price);
     if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
-      toast({ title: "Price must be a valid non-negative number", variant: "destructive" });
+      toast({ title: t("clinic.services.price_must_be_a_valid_non_negative_number"), variant: "destructive" });
       return;
     }
 
@@ -156,16 +158,15 @@ export default function ClinicServices() {
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Services</h2>
-          <p className="text-muted-foreground text-sm mt-1">Manage clinic services with doctor assignment</p>
+          <h2 className="text-2xl font-bold">{t("clinic.services.title")}</h2>
         </div>
-        <Button onClick={openAdd} className="gradient-primary text-primary-foreground border-0 gap-2"><Plus className="h-4 w-4" />Add Service</Button>
+        <Button onClick={openAdd} className="gradient-primary text-primary-foreground border-0 gap-2"><Plus className="h-4 w-4" />{t("clinic.services.add")}</Button>
       </div>
 
       <div className="relative max-w-sm mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name, type, or doctor..."
+          placeholder={t("clinic.services.search_by_name_type_or_doctor")}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="pl-10"
@@ -178,25 +179,25 @@ export default function ClinicServices() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-start font-medium p-4 text-muted-foreground">#</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Name</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Type</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Doctor</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Price</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Actions</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.name")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.type")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.doctor")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.price")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={6}>Loading services...</td></tr>}
-              {error && <tr><td className="p-4 text-destructive" colSpan={6}>{error instanceof Error ? error.message : "Failed to load services"}</td></tr>}
-              {!isLoading && !error && paged.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={6}>No services found.</td></tr>}
+              {isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.services.loading_services")}</td></tr>}
+              {error && <tr><td className="p-4 text-destructive" colSpan={6}>{error instanceof Error ? error.message : t("clinic.services.failed_to_load_services")}</td></tr>}
+              {!isLoading && !error && paged.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.services.no_services_found")}</td></tr>}
               {paged.map((s) => (
                 <tr key={String(s.id)} className="hover:bg-muted/30 transition-colors">
                   <td className="p-4 text-muted-foreground">{String(s.id)}</td>
-                  <td className="p-4 font-medium">{s.name ?? "—"}</td>
+                  <td className="p-4 font-medium">{s.name ?? "---"}</td>
                   <td className="p-4 text-muted-foreground capitalize">{s.category ?? "sub"}</td>
-                  <td className="p-4 text-muted-foreground">{s.doctor_name ?? "—"}</td>
+                  <td className="p-4 text-muted-foreground">{s.doctor_name ?? "---"}</td>
                   <td className="p-4 text-muted-foreground">{s.price ?? "0"} EGP</td>
-                  <td className="p-4"><div className="flex gap-2"><Button variant="outline" size="sm" className="gap-2" onClick={() => openShow(s)}><Eye className="h-4 w-4" />Show</Button><Button variant="outline" size="sm" className="gap-2" onClick={() => openEdit(s)}><Edit className="h-4 w-4" />Edit</Button></div></td>
+                  <td className="p-4"><div className="flex gap-2"><Button variant="outline" size="sm" className="gap-2" onClick={() => openShow(s)}><Eye className="h-4 w-4" />{t("clinic.services.show")}</Button><Button variant="outline" size="sm" className="gap-2" onClick={() => openEdit(s)}><Edit className="h-4 w-4" />{t("clinic.services.edit")}</Button></div></td>
                 </tr>
               ))}
             </tbody>
@@ -204,10 +205,10 @@ export default function ClinicServices() {
         </div>
         {!isLoading && !error && totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t">
-            <p className="text-sm text-muted-foreground">Page {safePage} of {totalPages}</p>
+            <p className="text-sm text-muted-foreground">{t("clinic.services.page")} {safePage} {t("clinic.services.of")} {totalPages}</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}>Previous</Button>
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}>Next</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}>{t("clinic.services.previous")}</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}>{t("clinic.services.next")}</Button>
             </div>
           </div>
         )}
@@ -215,10 +216,10 @@ export default function ClinicServices() {
 
       <Dialog open={dialogMode !== null} onOpenChange={(open) => !open && setDialogMode(null)}>
         <DialogContent className="sm:max-w-xl">
-          <DialogHeader><DialogTitle>{dialogMode === "add" ? "Add Service" : dialogMode === "edit" ? "Edit Service" : "Service Details"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{dialogMode === "add" ? t("clinic.services.add") : dialogMode === "edit" ? t("clinic.services.edit") : t("clinic.services.details")}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
-              <Label>Service Name</Label>
+              <Label>{t("clinic.services.name")}</Label>
               <Input
                 value={form.service_name}
                 onChange={(e) => setForm((f) => ({ ...f, service_name: e.target.value }))}
@@ -227,39 +228,39 @@ export default function ClinicServices() {
             </div>
             <div className="grid sm:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="service-doctor">Doctor</Label>
+                <Label htmlFor="service-doctor">{t("clinic.services.doctor")}</Label>
                 <select
                   id="service-doctor"
-                  title="Doctor"
+                  title={t("clinic.services.doctor")}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   value={form.doctor_id}
                   onChange={(e) => setForm((f) => ({ ...f, doctor_id: e.target.value }))}
                   disabled={dialogMode === "show"}
                 >
-                  <option value="">Select doctor</option>
+                  <option value="">{t("clinic.services.select_doctor")}</option>
                   {doctors.map((doctor) => (
                     <option key={doctor.id} value={doctor.id}>
-                      {doctor.name}
+                      {doctor.name ?? `${t("clinic.services.doctor")} ${doctor.id}`}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="service-type">Type</Label>
+                <Label htmlFor="service-type">{t("clinic.services.type")}</Label>
                 <select
                   id="service-type"
-                  title="Type"
+                  title={t("clinic.services.type")}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   value={form.type}
                   onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "main" | "sub" }))}
                   disabled={dialogMode === "show"}
                 >
-                  <option value="main">Main</option>
-                  <option value="sub">Sub</option>
+                  <option value="main">{t("clinic.services.main")}</option>
+                  <option value="sub">{t("clinic.services.sub")}</option>
                 </select>
               </div>
               <div className="space-y-2">
-                <Label>Price</Label>
+                <Label>{t("clinic.services.price")}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -271,7 +272,7 @@ export default function ClinicServices() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Notes</Label>
+              <Label>{t("clinic.services.notes")}</Label>
               <Textarea
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -282,7 +283,7 @@ export default function ClinicServices() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogMode(null)}>
-              Close
+              {t("clinic.services.close")}
             </Button>
             {dialogMode !== "show" && (
               <Button onClick={onSave} disabled={createMutation.isPending || updateMutation.isPending}>

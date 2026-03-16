@@ -158,14 +158,17 @@ export const adminApi = {
 		address?: string | null;
 		description?: string | null;
 		website?: string | null;
-		status?: "active" | "inactive";
+		status?: "pending" | "approved" | "rejected";
+		is_active?: boolean;
 		specialty_id?: number | null;
 		governorate_id?: number | null;
 		city_id?: number | null;
 		area_id?: number | null;
 	}) => request("/admin/clinics", { method: "POST", body: data, token: getSuperAdminToken() ?? undefined }),
-	updateClinicStatus: (id: string | number, status: "active" | "inactive") =>
-		request(`/admin/clinics/${id}/status`, { method: "PUT", body: { status }, token: getSuperAdminToken() ?? undefined }),
+	updateClinicStatus: (
+		id: string | number,
+		payload: { status?: "pending" | "approved" | "rejected"; is_active?: boolean },
+	) => request(`/admin/clinics/${id}/status`, { method: "PUT", body: payload, token: getSuperAdminToken() ?? undefined }),
 	deleteClinic: (id: string | number) =>
 		request(`/admin/clinics/${id}`, { method: "DELETE", token: getSuperAdminToken() ?? undefined }),
 	medicalLabs: (params?: Record<string, string>) => {

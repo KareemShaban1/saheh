@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type ClinicSettingsPayload = {
   id?: number;
@@ -30,6 +31,7 @@ type ClinicSettingsPayload = {
 };
 
 export default function ClinicSettings() {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [form, setForm] = useState({
     name: "",
@@ -111,12 +113,12 @@ export default function ClinicSettings() {
       setLogoFile(null);
       if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
       setLogoPreviewUrl(null);
-      toast({ title: "Clinic settings updated" });
+      toast({ title: t("clinic.settings.clinic_settings_updated") });
     },
     onError: (e) =>
       toast({
-        title: "Failed to update settings",
-        description: e instanceof Error ? e.message : "Unknown error",
+        title: t("clinic.settings.failed_to_update_settings"),
+        description: e instanceof Error ? e.message : t("clinic.settings.unknown_error"),
         variant: "destructive",
       }),
   });
@@ -134,18 +136,17 @@ export default function ClinicSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Clinic Settings</h2>
-        <p className="text-sm text-muted-foreground mt-1">Update clinic details and logo</p>
+        <h2 className="text-2xl font-bold">{t("clinic.settings.title")}</h2>
       </div>
 
-      {settingsQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading settings...</p> : null}
+      {settingsQuery.isLoading ? <p className="text-sm text-muted-foreground">{t("clinic.settings.loading_settings")}</p> : null}
       {settingsQuery.error ? (
         <p className="text-sm text-destructive">{settingsQuery.error instanceof Error ? settingsQuery.error.message : "Failed to load settings"}</p>
       ) : null}
 
       <div className="rounded-xl border bg-card p-4 space-y-5">
         <div className="space-y-2">
-          <Label>Clinic Logo</Label>
+          <Label>{t("clinic.settings.clinic_logo")}</Label>
           <div className="flex items-center gap-4">
             <div className="h-20 w-20 rounded-lg border bg-muted/30 flex items-center justify-center overflow-hidden">
               {displayedLogo ? (
@@ -165,40 +166,40 @@ export default function ClinicSettings() {
                   setLogoPreviewUrl(file ? URL.createObjectURL(file) : null);
                 }}
               />
-              <p className="text-xs text-muted-foreground">PNG/JPG up to 4MB.</p>
+              <p className="text-xs text-muted-foreground">{t("clinic.settings.png_jpg_up_to_4mb")}</p>
             </div>
           </div>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Name *</Label>
+            <Label>{t("clinic.settings.name")} *</Label>
             <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label>{t("clinic.settings.email")}</Label>
             <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Phone</Label>
+            <Label>{t("clinic.settings.phone")}</Label>
             <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Website</Label>
+            <Label>{t("clinic.settings.website")}</Label>
             <Input value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} placeholder="https://example.com" />
           </div>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Specialty</Label>
+            <Label>{t("clinic.settings.specialty")}</Label>
             <Select
               value={form.specialty_id || "none"}
               onValueChange={(value) => setForm((f) => ({ ...f, specialty_id: value === "none" ? "" : value }))}
             >
-              <SelectTrigger><SelectValue placeholder="Select specialty" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("clinic.settings.select_specialty")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">{t("clinic.settings.none")}</SelectItem>
                 {specialties.map((item) => (
                   <SelectItem key={item.id} value={String(item.id)}>
                     {item.name}
@@ -208,7 +209,7 @@ export default function ClinicSettings() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Governorate</Label>
+            <Label>{t("clinic.settings.governorate")}</Label>
             <Select
               value={form.governorate_id || "none"}
               onValueChange={(value) =>
@@ -220,9 +221,9 @@ export default function ClinicSettings() {
                 }))
               }
             >
-              <SelectTrigger><SelectValue placeholder="Select governorate" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("clinic.settings.select_governorate")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">{t("clinic.settings.none")}</SelectItem>
                 {governorates.map((item) => (
                   <SelectItem key={item.id} value={String(item.id)}>
                     {item.name}
@@ -232,7 +233,7 @@ export default function ClinicSettings() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>City</Label>
+            <Label>{t("clinic.settings.city")}</Label>
             <Select
               value={form.city_id || "none"}
               onValueChange={(value) =>
@@ -244,9 +245,9 @@ export default function ClinicSettings() {
               }
               disabled={!form.governorate_id}
             >
-              <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("clinic.settings.select_city")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">{t("clinic.settings.none")}</SelectItem>
                 {filteredCities.map((item) => (
                   <SelectItem key={item.id} value={String(item.id)}>
                     {item.name}
@@ -256,15 +257,15 @@ export default function ClinicSettings() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Area</Label>
+            <Label>{t("clinic.settings.area")}</Label>
             <Select
               value={form.area_id || "none"}
               onValueChange={(value) => setForm((f) => ({ ...f, area_id: value === "none" ? "" : value }))}
               disabled={!form.governorate_id}
             >
-              <SelectTrigger><SelectValue placeholder="Select area" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("clinic.settings.select_area")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">{t("clinic.settings.none")}</SelectItem>
                 {filteredAreas.map((item) => (
                   <SelectItem key={item.id} value={String(item.id)}>
                     {item.name}
@@ -276,12 +277,12 @@ export default function ClinicSettings() {
         </div>
 
         <div className="space-y-2">
-          <Label>Address</Label>
+          <Label>{t("clinic.settings.address")}</Label>
           <Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
         </div>
 
         <div className="space-y-2">
-          <Label>Description</Label>
+          <Label>{t("clinic.settings.description")}</Label>
           <Textarea rows={4} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
         </div>
 
@@ -291,7 +292,7 @@ export default function ClinicSettings() {
             disabled={updateMutation.isPending || !form.name.trim()}
             className="gradient-primary text-primary-foreground border-0"
           >
-            {updateMutation.isPending ? "Saving..." : "Save Changes"}
+            {updateMutation.isPending ? t("clinic.settings.saving") : t("clinic.settings.save_changes")}
           </Button>
         </div>
       </div>

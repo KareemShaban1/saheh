@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function ClinicAnnouncements() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<Array<{ id: string | number; title?: string; content?: string; audience?: string; channel?: string; createdAt?: string; status?: string }>>([]);
@@ -61,15 +63,15 @@ export default function ClinicAnnouncements() {
   };
   const onSave = () => {
     if (!form.title.trim()) {
-      toast({ title: "Title is required", variant: "destructive" });
+      toast({ title: t("clinic.announcements.title_is_required"), variant: "destructive" });
       return;
     }
     if (dialogMode === "add") {
       setItems((prev) => [{ id: `local-${Date.now()}`, title: form.title, content: form.content, audience: form.audience, channel: form.channel, status: form.status, createdAt: new Date().toISOString().slice(0, 10) }, ...prev]);
-      toast({ title: "Announcement added" });
+      toast({ title: t("clinic.announcements.announcement_added") });
     } else if (dialogMode === "edit") {
       setItems((prev) => prev.map((a) => (String(a.id) === activeId ? { ...a, title: form.title, content: form.content, audience: form.audience, channel: form.channel, status: form.status } : a)));
-      toast({ title: "Announcement updated" });
+      toast({ title: t("clinic.announcements.announcement_updated") });
     }
     setDialogMode(null);
   };
@@ -78,16 +80,15 @@ export default function ClinicAnnouncements() {
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Announcements</h2>
-          <p className="text-muted-foreground text-sm mt-1">Table with add, show, and edit dialogs</p>
+          <h2 className="text-2xl font-bold">{t("clinic.announcements.title")}</h2>
         </div>
-        <Button onClick={openAdd} className="gradient-primary text-primary-foreground border-0 gap-2"><Plus className="h-4 w-4" />Add Announcement</Button>
+        <Button onClick={openAdd} className="gradient-primary text-primary-foreground border-0 gap-2"><Plus className="h-4 w-4" />{t("clinic.announcements.add")}</Button>
       </div>
 
       <div className="relative max-w-sm mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search announcements..."
+          placeholder={t("clinic.announcements.search")}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="pl-10"
@@ -100,17 +101,17 @@ export default function ClinicAnnouncements() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-start font-medium p-4 text-muted-foreground">#</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Title</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Audience</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Channel</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Status</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Actions</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.announcements.title")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.announcements.audience")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.announcements.channel")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.announcements.status")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.announcements.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={6}>Loading announcements...</td></tr>}
-              {error && <tr><td className="p-4 text-destructive" colSpan={6}>{error instanceof Error ? error.message : "Failed to load announcements"}</td></tr>}
-              {!isLoading && !error && paged.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={6}>No announcements found.</td></tr>}
+              {isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.announcements.loading_announcements")}</td></tr>}
+              {error && <tr><td className="p-4 text-destructive" colSpan={6}>{error instanceof Error ? error.message : t("clinic.announcements.failed_to_load_announcements")}</td></tr>}
+              {!isLoading && !error && paged.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.announcements.no_announcements_found")}</td></tr>}
               {paged.map((a) => (
                 <tr key={String(a.id)} className="hover:bg-muted/30 transition-colors">
                   <td className="p-4 text-muted-foreground">{String(a.id)}</td>
@@ -126,10 +127,10 @@ export default function ClinicAnnouncements() {
         </div>
         {!isLoading && !error && totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t">
-            <p className="text-sm text-muted-foreground">Page {safePage} of {totalPages}</p>
+            <p className="text-sm text-muted-foreground">{t("clinic.announcements.page")} {safePage} {t("clinic.announcements.of")} {totalPages}</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}>Previous</Button>
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}>Next</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}>{t("clinic.announcements.previous")}</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}>{t("clinic.announcements.next")}</Button>
             </div>
           </div>
         )}
@@ -137,17 +138,17 @@ export default function ClinicAnnouncements() {
 
       <Dialog open={dialogMode !== null} onOpenChange={(open) => !open && setDialogMode(null)}>
         <DialogContent className="sm:max-w-xl">
-          <DialogHeader><DialogTitle>{dialogMode === "add" ? "Add Announcement" : dialogMode === "edit" ? "Edit Announcement" : "Announcement Details"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{dialogMode === "add" ? t("clinic.announcements.add") : dialogMode === "edit" ? t("clinic.announcements.edit") : t("clinic.announcements.details")}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="space-y-2"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} disabled={dialogMode === "show"} /></div>
-            <div className="space-y-2"><Label>Content</Label><Input value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} disabled={dialogMode === "show"} /></div>
+            <div className="space-y-2"><Label>{t("clinic.announcements.title")}</Label><Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} disabled={dialogMode === "show"} /></div>
+            <div className="space-y-2"><Label>{t("clinic.announcements.content")}</Label><Input value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} disabled={dialogMode === "show"} /></div>
             <div className="grid sm:grid-cols-3 gap-4">
-              <div className="space-y-2"><Label>Audience</Label><Input value={form.audience} onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value }))} disabled={dialogMode === "show"} /></div>
-              <div className="space-y-2"><Label>Channel</Label><Input value={form.channel} onChange={(e) => setForm((f) => ({ ...f, channel: e.target.value }))} disabled={dialogMode === "show"} /></div>
-              <div className="space-y-2"><Label>Status</Label><Input value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} disabled={dialogMode === "show"} /></div>
+              <div className="space-y-2"><Label>{t("clinic.announcements.audience")}</Label><Input value={form.audience} onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value }))} disabled={dialogMode === "show"} /></div>
+              <div className="space-y-2"><Label>{t("clinic.announcements.channel")}</Label><Input value={form.channel} onChange={(e) => setForm((f) => ({ ...f, channel: e.target.value }))} disabled={dialogMode === "show"} /></div>
+              <div className="space-y-2"><Label>{t("clinic.announcements.status")}</Label><Input value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} disabled={dialogMode === "show"} /></div>
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setDialogMode(null)}>Close</Button>{dialogMode !== "show" && <Button onClick={onSave}>Save</Button>}</DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDialogMode(null)}>{t("clinic.announcements.close")}</Button>{dialogMode !== "show" && <Button onClick={onSave}>{t("clinic.announcements.save")}</Button>}</DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

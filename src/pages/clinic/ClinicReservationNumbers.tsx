@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type NumberRow = {
   id: string | number;
@@ -18,6 +19,7 @@ type NumberRow = {
 };
 
 export default function ClinicReservationNumbers() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<NumberRow[]>([]);
@@ -90,7 +92,7 @@ export default function ClinicReservationNumbers() {
 
   const onSave = () => {
     if (!form.doctor_id || !form.reservation_date) {
-      toast({ title: "Missing required fields", description: "Doctor and date are required.", variant: "destructive" });
+      toast({ title: t("clinic.reservations-numbers.missing_required_fields"), description: t("clinic.reservations-numbers.doctor_and_date_are_required"), variant: "destructive" });
       return;
     }
     if (dialogMode === "add") {
@@ -104,7 +106,7 @@ export default function ClinicReservationNumbers() {
         },
         ...prev,
       ]);
-      toast({ title: "Added", description: "Reservation number row added in dashboard view." });
+      toast({ title: t("clinic.reservations-numbers.added"), description: t("clinic.reservations-numbers.reservation_number_row_added_in_dashboard_view") });
     } else if (dialogMode === "edit") {
       setItems((prev) =>
         prev.map((r) =>
@@ -119,7 +121,7 @@ export default function ClinicReservationNumbers() {
             : r,
         ),
       );
-      toast({ title: "Updated", description: "Reservation number row updated in dashboard view." });
+      toast({ title: t("clinic.reservations-numbers.updated"), description: t("clinic.reservations-numbers.reservation_number_row_updated_in_dashboard_view") });
     }
     setDialogMode(null);
   };
@@ -128,19 +130,18 @@ export default function ClinicReservationNumbers() {
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Reservation Numbers</h2>
-          <p className="text-muted-foreground text-sm mt-1">Table with add, show, and edit dialogs</p>
+          <h2 className="text-2xl font-bold">{t("clinic.reservations-numbers.title")}</h2>
         </div>
         <Button onClick={openAdd} className="gradient-primary text-primary-foreground border-0 gap-2">
           <Plus className="h-4 w-4" />
-          Add
+          {t("clinic.reservations-numbers.add")}
         </Button>
       </div>
 
       <div className="relative max-w-sm mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by doctor or day..."
+          placeholder={t("clinic.reservations-numbers.search_by_doctor_or_day")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -156,45 +157,45 @@ export default function ClinicReservationNumbers() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-start font-medium p-4 text-muted-foreground">#</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Doctor</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Date</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Reservations Count</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Actions</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.reservations-numbers.doctor")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.reservations-numbers.date")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.reservations-numbers.reservations_count")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.reservations-numbers.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {isLoading && (
                 <tr>
-                  <td className="p-4 text-muted-foreground" colSpan={5}>Loading reservation numbers...</td>
+                  <td className="p-4 text-muted-foreground" colSpan={5}>{t("clinic.reservations-numbers.loading_reservation_numbers")}</td>
                 </tr>
               )}
               {error && (
                 <tr>
                   <td className="p-4 text-destructive" colSpan={5}>
-                    {error instanceof Error ? error.message : "Failed to load reservation numbers"}
+                    {error instanceof Error ? error.message : t("clinic.reservations-numbers.failed_to_load_reservation_numbers")}
                   </td>
                 </tr>
               )}
               {!isLoading && !error && paged.length === 0 && (
                 <tr>
-                  <td className="p-4 text-muted-foreground" colSpan={5}>No data found.</td>
+                  <td className="p-4 text-muted-foreground" colSpan={5}>{t("clinic.reservations-numbers.no_data_found")}</td>
                 </tr>
               )}
               {paged.map((r) => (
                 <tr key={String(r.id)} className="hover:bg-muted/30 transition-colors">
                   <td className="p-4 text-muted-foreground">{String(r.id)}</td>
-                  <td className="p-4 font-medium">{r.doctor_name ?? "—"}</td>
-                  <td className="p-4 text-muted-foreground">{r.reservation_date ?? "—"}</td>
+                  <td className="p-4 font-medium">{r.doctor_name ?? "---"}</td>
+                  <td className="p-4 text-muted-foreground">{r.reservation_date ?? "---"}</td>
                   <td className="p-4 text-muted-foreground">{r.num_of_reservations ?? 0}</td>
                   <td className="p-4">
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="gap-2" onClick={() => openShow(r)}>
                         <Eye className="h-4 w-4" />
-                        Show
+                        {t("clinic.reservations-numbers.show")}
                       </Button>
                       <Button variant="outline" size="sm" className="gap-2" onClick={() => openEdit(r)}>
                         <Edit className="h-4 w-4" />
-                        Edit
+                        {t("clinic.reservations-numbers.edit")}
                       </Button>
                     </div>
                   </td>
@@ -205,10 +206,10 @@ export default function ClinicReservationNumbers() {
         </div>
         {!isLoading && !error && totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t">
-            <p className="text-sm text-muted-foreground">Page {safePage} of {totalPages}</p>
+            <p className="text-sm text-muted-foreground">{t("clinic.reservations-numbers.page")} {safePage} {t("clinic.reservations-numbers.of")} {totalPages}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}>
-                Previous
+                {t("clinic.reservations-numbers.previous")}
               </Button>
               <Button
                 variant="outline"
@@ -216,7 +217,7 @@ export default function ClinicReservationNumbers() {
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={safePage >= totalPages}
               >
-                Next
+                {t("clinic.reservations-numbers.next")}
               </Button>
             </div>
           </div>
@@ -227,24 +228,24 @@ export default function ClinicReservationNumbers() {
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              {dialogMode === "add" ? "Add Reservation Number" : dialogMode === "edit" ? "Edit Reservation Number" : "Reservation Number Details"}
+              {dialogMode === "add" ? t("clinic.reservations-numbers.add_reservation_number") : dialogMode === "edit" ? t("clinic.reservations-numbers.edit_reservation_number") : t("clinic.reservations-numbers.reservation_number_details")}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
-              <Label>Doctor</Label>
+              <Label>{t("clinic.reservations-numbers.doctor")}</Label>
               <Select
                 value={form.doctor_id}
                 onValueChange={(v) => setForm((prev) => ({ ...prev, doctor_id: v }))}
                 disabled={dialogMode === "show"}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select doctor" />
+                  <SelectValue placeholder={t("clinic.reservations-numbers.select_doctor")} />
                 </SelectTrigger>
                 <SelectContent>
                   {doctors.map((d) => (
                     <SelectItem key={String(d.id)} value={String(d.id)}>
-                      {d.name ?? `Doctor ${d.id}`}
+                      {d.name ?? `${t("clinic.reservations-numbers.doctor")} ${d.id}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -252,7 +253,7 @@ export default function ClinicReservationNumbers() {
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Date</Label>
+                <Label>{t("clinic.reservations-numbers.date")}</Label>
                 <Input
                   type="date"
                   value={form.reservation_date}
@@ -261,7 +262,7 @@ export default function ClinicReservationNumbers() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Reservations Count</Label>
+                <Label>{t("clinic.reservations-numbers.reservations_count")}</Label>
                 <Input
                   type="number"
                   value={form.num_of_reservations}
@@ -272,8 +273,8 @@ export default function ClinicReservationNumbers() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogMode(null)}>Close</Button>
-            {dialogMode !== "show" && <Button onClick={onSave}>Save</Button>}
+            <Button variant="outline" onClick={() => setDialogMode(null)}>{t("clinic.reservations-numbers.close")}</Button>
+            {dialogMode !== "show" && <Button onClick={onSave}>{t("clinic.reservations-numbers.save")}</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>

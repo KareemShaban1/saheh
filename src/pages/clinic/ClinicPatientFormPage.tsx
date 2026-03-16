@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type FormState = {
   doctor_ids: string[];
@@ -47,7 +48,7 @@ export default function ClinicPatientFormPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
-
+  const { t } = useLanguage();
   const doctorsQuery = useQuery({
     queryKey: ["clinic", "doctors", "for-patient-form"],
     queryFn: () => clinicApi.doctors(),
@@ -122,12 +123,12 @@ export default function ClinicPatientFormPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["clinic", "patients"] });
       await queryClient.invalidateQueries({ queryKey: ["clinic", "patients", "all"] });
-      toast({ title: isEdit ? "Patient updated" : "Patient created" });
+      toast({ title: isEdit ? t("clinic.patients.patient_updated") : t("clinic.patients.patient_created") });
       navigate("/clinic-dashboard/patients");
     },
     onError: (e) => {
       toast({
-        title: "Failed to save patient",
+        title: t("clinic.patients.failed_to_save_patient"),
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
@@ -137,8 +138,8 @@ export default function ClinicPatientFormPage() {
   const onSubmit = () => {
     if (form.doctor_ids.length === 0 || !form.name || !form.address || !form.phone || !form.gender) {
       toast({
-        title: "Missing required fields",
-        description: "At least one doctor, name, address, phone and gender are required.",
+        title: t("clinic.patients.missing_required_fields"),
+        description: t("clinic.patients.at_least_one_doctor_name_address_phone_and_gender_are_required"),
         variant: "destructive",
       });
       return;
@@ -150,13 +151,12 @@ export default function ClinicPatientFormPage() {
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">{isEdit ? "Edit Patient" : "Create Patient"}</h2>
-          <p className="text-muted-foreground text-sm mt-1">Manage patient profile and related doctor</p>
+          <h2 className="text-2xl font-bold">{isEdit ? t("clinic.patients.edit") : t("clinic.patients.create")}</h2>
         </div>
         <Button asChild variant="outline" className="gap-2">
           <Link to="/clinic-dashboard/patients">
             <ArrowLeft className="h-4 w-4" />
-            Back
+            {t("clinic.patients.back")}
           </Link>
         </Button>
       </div>
@@ -164,10 +164,10 @@ export default function ClinicPatientFormPage() {
       <div className="rounded-xl border bg-card p-4 space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Assigned Doctors *</Label>
+            <Label>{t("clinic.patients.assigned_doctors")} *</Label>
             <div className="max-h-44 overflow-y-auto rounded-md border p-3 space-y-2">
               {doctors.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No doctors available.</p>
+                <p className="text-xs text-muted-foreground">{t("clinic.patients.no_doctors_available")}</p>
               ) : (
                 doctors.map((d) => {
                   const doctorId = String(d.id);
@@ -194,63 +194,63 @@ export default function ClinicPatientFormPage() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Patient Name *</Label>
+            <Label>{t("clinic.patients.patient_name")} *</Label>
             <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </div>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Address *</Label>
+            <Label>{t("clinic.patients.address")} *</Label>
             <Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label>{t("clinic.patients.email")}</Label>
             <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
           </div>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label>Password {isEdit ? "(optional)" : ""}</Label>
+            <Label>{t("clinic.patients.password")} {isEdit ? `(${t("clinic.patients.optional")})` : ""}</Label>
             <Input
               type="password"
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-              placeholder={isEdit ? "Leave empty to keep current password" : ""}
+              placeholder={isEdit ? t("clinic.patients.leave_empty_to_keep_current_password") : ""}
             />
           </div>
           <div className="space-y-2">
-            <Label>Phone *</Label>
+            <Label>{t("clinic.patients.phone")} *</Label>
             <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Whatsapp Number</Label>
+            <Label>{t("clinic.patients.whatsapp_number")}</Label>
             <Input value={form.whatsapp_number} onChange={(e) => setForm((f) => ({ ...f, whatsapp_number: e.target.value }))} />
           </div>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label>Age</Label>
+            <Label>{t("clinic.patients.age")}</Label>
             <Input value={form.age} onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Gender *</Label>
+            <Label>{t("clinic.patients.gender")} *</Label>
             <Select value={form.gender} onValueChange={(v) => setForm((f) => ({ ...f, gender: v as FormState["gender"] }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="male">male</SelectItem>
-                <SelectItem value="female">female</SelectItem>
+                <SelectItem value="male">{t("clinic.patients.male")}</SelectItem>
+                <SelectItem value="female">{t("clinic.patients.female")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Blood Type</Label>
+            <Label>{t("clinic.patients.blood_type")}</Label>
             <Select value={form.blood_group || "none"} onValueChange={(v) => setForm((f) => ({ ...f, blood_group: v === "none" ? "" : (v as FormState["blood_group"]) }))}>
-              <SelectTrigger><SelectValue placeholder="Select blood type" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("clinic.patients.select_blood_type")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Not set</SelectItem>
+                <SelectItem value="none">{t("clinic.patients.not_set")}</SelectItem>
                 <SelectItem value="A+">A+</SelectItem>
                 <SelectItem value="A-">A-</SelectItem>
                 <SelectItem value="B+">B+</SelectItem>
@@ -266,21 +266,21 @@ export default function ClinicPatientFormPage() {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Height</Label>
+            <Label>{t("clinic.patients.height")}</Label>
             <Input value={form.height} onChange={(e) => setForm((f) => ({ ...f, height: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Weight</Label>
+            <Label>{t("clinic.patients.weight")}</Label>
             <Input value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))} />
           </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={() => navigate("/clinic-dashboard/patients")} disabled={mutation.isPending}>
-            Cancel
+            {t("clinic.patients.cancel")}
           </Button>
           <Button onClick={onSubmit} disabled={mutation.isPending} className="gradient-primary text-primary-foreground border-0">
-            {mutation.isPending ? "Saving..." : isEdit ? "Save Changes" : "Create Patient"}
+            {mutation.isPending ? t("clinic.patients.saving") : isEdit ? t("clinic.patients.save_changes") : t("clinic.patients.create_patient")}
           </Button>
         </div>
       </div>

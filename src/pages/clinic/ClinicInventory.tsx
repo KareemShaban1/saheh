@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function ClinicInventory() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"categories" | "movements">("categories");
   const [categoryPage, setCategoryPage] = useState(1);
@@ -91,27 +93,27 @@ export default function ClinicInventory() {
   const onSave = () => {
     if (dialogTarget === "categories") {
       if (!categoryForm.name.trim()) {
-        toast({ title: "Category name is required", variant: "destructive" });
+        toast({ title: t("clinic.inventory.category_name_is_required"), variant: "destructive" });
         return;
       }
       if (dialogMode === "add") {
         setCategoriesState((prev) => [{ id: `local-${Date.now()}`, name: categoryForm.name, quantity: Number(categoryForm.quantity || 0), price: Number(categoryForm.price || 0) }, ...prev]);
-        toast({ title: "Category added" });
+        toast({ title: t("clinic.inventory.category_added") });
       } else if (dialogMode === "edit") {
         setCategoriesState((prev) => prev.map((c) => (String(c.id) === activeId ? { ...c, name: categoryForm.name, quantity: Number(categoryForm.quantity || 0), price: Number(categoryForm.price || 0) } : c)));
-        toast({ title: "Category updated" });
+        toast({ title: t("clinic.inventory.category_updated") });
       }
     } else {
       if (!movementForm.item.trim()) {
-        toast({ title: "Movement item is required", variant: "destructive" });
+        toast({ title: t("clinic.inventory.movement_item_is_required"), variant: "destructive" });
         return;
       }
       if (dialogMode === "add") {
         setMovementsState((prev) => [{ id: `local-${Date.now()}`, item: movementForm.item, type: movementForm.type, quantity: Number(movementForm.quantity || 0), date: movementForm.date || new Date().toISOString().slice(0, 10) }, ...prev]);
-        toast({ title: "Movement added" });
+        toast({ title: t("clinic.inventory.movement_added") });
       } else if (dialogMode === "edit") {
         setMovementsState((prev) => prev.map((m) => (String(m.id) === activeId ? { ...m, item: movementForm.item, type: movementForm.type, quantity: Number(movementForm.quantity || 0), date: movementForm.date } : m)));
-        toast({ title: "Movement updated" });
+        toast({ title: t("clinic.inventory.movement_updated") });
       }
     }
     setDialogMode(null);
@@ -121,20 +123,19 @@ export default function ClinicInventory() {
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Inventory</h2>
-          <p className="text-muted-foreground text-sm mt-1">Tables with pagination and add, show, edit dialogs</p>
+          <h2 className="text-2xl font-bold">{t("clinic.inventory.title")}</h2>
         </div>
-        <Button onClick={openAdd} className="gradient-primary text-primary-foreground border-0 gap-2"><Plus className="h-4 w-4" />Add {activeTab === "categories" ? "Category" : "Movement"}</Button>
+        <Button onClick={openAdd} className="gradient-primary text-primary-foreground border-0 gap-2"><Plus className="h-4 w-4" />{t("clinic.inventory.add")} {activeTab === "categories" ? t("clinic.inventory.category") : t("clinic.inventory.movement")}</Button>
       </div>
       <div className="relative max-w-sm mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input value={search} onChange={(e) => { setSearch(e.target.value); setCategoryPage(1); setMovementPage(1); }} className="pl-10" placeholder="Search inventory..." />
+        <Input value={search} onChange={(e) => { setSearch(e.target.value); setCategoryPage(1); setMovementPage(1); }} className="pl-10" placeholder={t("clinic.inventory.search")} />
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "categories" | "movements")}>
         <TabsList className="mb-4">
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="movements">Movements</TabsTrigger>
+          <TabsTrigger value="categories">{t("clinic.inventory.categories")}</TabsTrigger>
+          <TabsTrigger value="movements">{t("clinic.inventory.movements")}</TabsTrigger>
         </TabsList>
         <TabsContent value="categories">
           <div className="bg-card rounded-xl border shadow-card overflow-hidden">
@@ -142,16 +143,16 @@ export default function ClinicInventory() {
               <table className="w-full text-sm">
                 <thead><tr className="border-b bg-muted/50"><th className="text-start font-medium p-4 text-muted-foreground">#</th><th className="text-start font-medium p-4 text-muted-foreground">Name</th><th className="text-start font-medium p-4 text-muted-foreground">Quantity</th><th className="text-start font-medium p-4 text-muted-foreground">Price</th><th className="text-start font-medium p-4 text-muted-foreground">Actions</th></tr></thead>
                 <tbody className="divide-y">
-                  {categoriesQuery.isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={5}>Loading categories...</td></tr>}
-                  {categoriesQuery.error && <tr><td className="p-4 text-destructive" colSpan={5}>{categoriesQuery.error instanceof Error ? categoriesQuery.error.message : "Failed to load categories"}</td></tr>}
-                  {!categoriesQuery.isLoading && !categoriesQuery.error && pagedCategories.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={5}>No categories found.</td></tr>}
+                  {categoriesQuery.isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={5}>{t("clinic.inventory.loading_categories")}</td></tr>}
+                  {categoriesQuery.error && <tr><td className="p-4 text-destructive" colSpan={5}>{categoriesQuery.error instanceof Error ? categoriesQuery.error.message : t("clinic.inventory.failed_to_load_categories")}</td></tr>}
+                  {!categoriesQuery.isLoading && !categoriesQuery.error && pagedCategories.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={5}>{t("clinic.inventory.no_categories_found")}</td></tr>}
                   {pagedCategories.map((c) => (
                     <tr key={String(c.id)} className="hover:bg-muted/30 transition-colors">
                       <td className="p-4 text-muted-foreground">{String(c.id)}</td>
                       <td className="p-4 font-medium">{c.name ?? "—"}</td>
                       <td className="p-4 text-muted-foreground">{c.quantity ?? 0}</td>
                       <td className="p-4 text-muted-foreground">{c.price ?? 0}</td>
-                      <td className="p-4"><div className="flex gap-2"><Button variant="outline" size="sm" className="gap-2" onClick={() => openShowCategory(c)}><Eye className="h-4 w-4" />Show</Button><Button variant="outline" size="sm" className="gap-2" onClick={() => openEditCategory(c)}><Edit className="h-4 w-4" />Edit</Button></div></td>
+                      <td className="p-4"><div className="flex gap-2"><Button variant="outline" size="sm" className="gap-2" onClick={() => openShowCategory(c)}><Eye className="h-4 w-4" />{t("clinic.inventory.show")}</Button><Button variant="outline" size="sm" className="gap-2" onClick={() => openEditCategory(c)}><Edit className="h-4 w-4" />{t("clinic.inventory.edit")}</Button></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -159,10 +160,10 @@ export default function ClinicInventory() {
             </div>
             {!categoriesQuery.isLoading && !categoriesQuery.error && categoriesTotalPages > 1 && (
               <div className="flex items-center justify-between p-4 border-t">
-                <p className="text-sm text-muted-foreground">Page {safeCategoryPage} of {categoriesTotalPages}</p>
+                <p className="text-sm text-muted-foreground">{t("clinic.inventory.page")} {safeCategoryPage} {t("clinic.inventory.of")} {categoriesTotalPages}</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setCategoryPage((p) => Math.max(1, p - 1))} disabled={safeCategoryPage <= 1}>Previous</Button>
-                  <Button variant="outline" size="sm" onClick={() => setCategoryPage((p) => Math.min(categoriesTotalPages, p + 1))} disabled={safeCategoryPage >= categoriesTotalPages}>Next</Button>
+                  <Button variant="outline" size="sm" onClick={() => setCategoryPage((p) => Math.max(1, p - 1))} disabled={safeCategoryPage <= 1}>{t("clinic.inventory.previous")}</Button>
+                  <Button variant="outline" size="sm" onClick={() => setCategoryPage((p) => Math.min(categoriesTotalPages, p + 1))} disabled={safeCategoryPage >= categoriesTotalPages}>{t("clinic.inventory.next")}</Button>
                 </div>
               </div>
             )}
@@ -174,9 +175,9 @@ export default function ClinicInventory() {
               <table className="w-full text-sm">
                 <thead><tr className="border-b bg-muted/50"><th className="text-start font-medium p-4 text-muted-foreground">#</th><th className="text-start font-medium p-4 text-muted-foreground">Item</th><th className="text-start font-medium p-4 text-muted-foreground">Type</th><th className="text-start font-medium p-4 text-muted-foreground">Quantity</th><th className="text-start font-medium p-4 text-muted-foreground">Date</th><th className="text-start font-medium p-4 text-muted-foreground">Actions</th></tr></thead>
                 <tbody className="divide-y">
-                  {movementsQuery.isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={6}>Loading movements...</td></tr>}
-                  {movementsQuery.error && <tr><td className="p-4 text-destructive" colSpan={6}>{movementsQuery.error instanceof Error ? movementsQuery.error.message : "Failed to load movements"}</td></tr>}
-                  {!movementsQuery.isLoading && !movementsQuery.error && pagedMovements.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={6}>No movements found.</td></tr>}
+                  {movementsQuery.isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.inventory.loading_movements")}</td></tr>}
+                  {movementsQuery.error && <tr><td className="p-4 text-destructive" colSpan={6}>{movementsQuery.error instanceof Error ? movementsQuery.error.message : t("clinic.inventory.failed_to_load_movements")}</td></tr>}
+                  {!movementsQuery.isLoading && !movementsQuery.error && pagedMovements.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.inventory.no_movements_found")}</td></tr>}
                   {pagedMovements.map((m) => (
                     <tr key={String(m.id)} className="hover:bg-muted/30 transition-colors">
                       <td className="p-4 text-muted-foreground">{String(m.id)}</td>
@@ -192,10 +193,10 @@ export default function ClinicInventory() {
             </div>
             {!movementsQuery.isLoading && !movementsQuery.error && movementsTotalPages > 1 && (
               <div className="flex items-center justify-between p-4 border-t">
-                <p className="text-sm text-muted-foreground">Page {safeMovementPage} of {movementsTotalPages}</p>
+                <p className="text-sm text-muted-foreground">{t("clinic.inventory.page")} {safeMovementPage} {t("clinic.inventory.of")} {movementsTotalPages}</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setMovementPage((p) => Math.max(1, p - 1))} disabled={safeMovementPage <= 1}>Previous</Button>
-                  <Button variant="outline" size="sm" onClick={() => setMovementPage((p) => Math.min(movementsTotalPages, p + 1))} disabled={safeMovementPage >= movementsTotalPages}>Next</Button>
+                  <Button variant="outline" size="sm" onClick={() => setMovementPage((p) => Math.max(1, p - 1))} disabled={safeMovementPage <= 1}>{t("clinic.inventory.previous")}</Button>
+                  <Button variant="outline" size="sm" onClick={() => setMovementPage((p) => Math.min(movementsTotalPages, p + 1))} disabled={safeMovementPage >= movementsTotalPages}>{t("clinic.inventory.next")}</Button>
                 </div>
               </div>
             )}
@@ -205,26 +206,26 @@ export default function ClinicInventory() {
 
       <Dialog open={dialogMode !== null} onOpenChange={(open) => !open && setDialogMode(null)}>
         <DialogContent className="sm:max-w-xl">
-          <DialogHeader><DialogTitle>{dialogMode === "add" ? `Add ${dialogTarget === "categories" ? "Category" : "Movement"}` : dialogMode === "edit" ? `Edit ${dialogTarget === "categories" ? "Category" : "Movement"}` : `${dialogTarget === "categories" ? "Category" : "Movement"} Details`}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{dialogMode === "add" ? t("clinic.inventory.add") + " " + (dialogTarget === "categories" ? t("clinic.inventory.category") : t("clinic.inventory.movement")) : dialogMode === "edit" ? t("clinic.inventory.edit") + " " + (dialogTarget === "categories" ? t("clinic.inventory.category") : t("clinic.inventory.movement")) : t("clinic.inventory.details") + " " + (dialogTarget === "categories" ? t("clinic.inventory.category") : t("clinic.inventory.movement"))}</DialogTitle></DialogHeader>
           {dialogTarget === "categories" ? (
             <div className="grid gap-4 py-2">
-              <div className="space-y-2"><Label>Name</Label><Input value={categoryForm.name} onChange={(e) => setCategoryForm((f) => ({ ...f, name: e.target.value }))} disabled={dialogMode === "show"} /></div>
+              <div className="space-y-2"><Label>{t("clinic.inventory.name")}</Label><Input value={categoryForm.name} onChange={(e) => setCategoryForm((f) => ({ ...f, name: e.target.value }))} disabled={dialogMode === "show"} /></div>
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Quantity</Label><Input type="number" value={categoryForm.quantity} onChange={(e) => setCategoryForm((f) => ({ ...f, quantity: e.target.value }))} disabled={dialogMode === "show"} /></div>
-                <div className="space-y-2"><Label>Price</Label><Input type="number" value={categoryForm.price} onChange={(e) => setCategoryForm((f) => ({ ...f, price: e.target.value }))} disabled={dialogMode === "show"} /></div>
+                <div className="space-y-2"><Label>{t("clinic.inventory.quantity")}</Label><Input type="number" value={categoryForm.quantity} onChange={(e) => setCategoryForm((f) => ({ ...f, quantity: e.target.value }))} disabled={dialogMode === "show"} /></div>
+                <div className="space-y-2"><Label>{t("clinic.inventory.price")}</Label><Input type="number" value={categoryForm.price} onChange={(e) => setCategoryForm((f) => ({ ...f, price: e.target.value }))} disabled={dialogMode === "show"} /></div>
               </div>
             </div>
           ) : (
             <div className="grid gap-4 py-2">
-              <div className="space-y-2"><Label>Item</Label><Input value={movementForm.item} onChange={(e) => setMovementForm((f) => ({ ...f, item: e.target.value }))} disabled={dialogMode === "show"} /></div>
+              <div className="space-y-2"><Label>{t("clinic.inventory.item")}</Label><Input value={movementForm.item} onChange={(e) => setMovementForm((f) => ({ ...f, item: e.target.value }))} disabled={dialogMode === "show"} /></div>
               <div className="grid sm:grid-cols-3 gap-4">
-                <div className="space-y-2"><Label>Type</Label><Input value={movementForm.type} onChange={(e) => setMovementForm((f) => ({ ...f, type: e.target.value }))} disabled={dialogMode === "show"} /></div>
-                <div className="space-y-2"><Label>Quantity</Label><Input type="number" value={movementForm.quantity} onChange={(e) => setMovementForm((f) => ({ ...f, quantity: e.target.value }))} disabled={dialogMode === "show"} /></div>
-                <div className="space-y-2"><Label>Date</Label><Input type="date" value={movementForm.date} onChange={(e) => setMovementForm((f) => ({ ...f, date: e.target.value }))} disabled={dialogMode === "show"} /></div>
+                <div className="space-y-2"><Label>{t("clinic.inventory.type")}</Label><Input value={movementForm.type} onChange={(e) => setMovementForm((f) => ({ ...f, type: e.target.value }))} disabled={dialogMode === "show"} /></div>
+                <div className="space-y-2"><Label>{t("clinic.inventory.quantity")}</Label><Input type="number" value={movementForm.quantity} onChange={(e) => setMovementForm((f) => ({ ...f, quantity: e.target.value }))} disabled={dialogMode === "show"} /></div>
+                <div className="space-y-2"><Label>{t("clinic.inventory.date")}</Label><Input type="date" value={movementForm.date} onChange={(e) => setMovementForm((f) => ({ ...f, date: e.target.value }))} disabled={dialogMode === "show"} /></div>
               </div>
             </div>
           )}
-          <DialogFooter><Button variant="outline" onClick={() => setDialogMode(null)}>Close</Button>{dialogMode !== "show" && <Button onClick={onSave}>Save</Button>}</DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDialogMode(null)}>{t("clinic.inventory.close")}</Button>{dialogMode !== "show" && <Button onClick={onSave}>{t("clinic.inventory.save")}</Button>}</DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

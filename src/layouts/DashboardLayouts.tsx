@@ -456,11 +456,11 @@ export function DashboardLayout({ title, titleKey, basePath, items }: DashboardL
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setViewOpen(true)}>
                     <User className="h-4 w-4 mr-2" />
-                    User Data
+                    {t("auth.user_data")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setEditOpen(true)}>
                     <Settings className="h-4 w-4 mr-2" />
-                    Update Profile
+                    {t("auth.update_profile")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleDashboardLogout}>
@@ -480,45 +480,45 @@ export function DashboardLayout({ title, titleKey, basePath, items }: DashboardL
 
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>User Data</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("auth.user_data")}</DialogTitle></DialogHeader>
           <div className="space-y-2 text-sm">
-            <p><span className="font-medium">Name:</span> {String(currentUser?.name ?? "—")}</p>
-            <p><span className="font-medium">Email:</span> {String(currentUser?.email ?? "—")}</p>
-            {!isSuperAdminArea && <p><span className="font-medium">Phone:</span> {String(currentUser?.phone ?? "—")}</p>}
-            {!isSuperAdminArea && <p><span className="font-medium">Job Title:</span> {String(currentUser?.job_title ?? "—")}</p>}
+            <p><span className="font-medium">{t("auth.name")}:</span> {String(currentUser?.name ?? "—")}</p>
+            <p><span className="font-medium">{t("auth.email")}:</span> {String(currentUser?.email ?? "—")}</p>
+            {!isSuperAdminArea && <p><span className="font-medium">{t("auth.phone")}:</span> {String(currentUser?.phone ?? "—")}</p>}
+            {!isSuperAdminArea && <p><span className="font-medium">{t("auth.job_title")}:</span> {String(currentUser?.job_title ?? "—")}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setViewOpen(false)}>{t("auth.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Update Profile</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("auth.update_profile")}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Name</Label>
+              <Label>{t("auth.name")}</Label>
               <Input value={profileForm.name} onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Email</Label>
+              <Label>{t("auth.email")}</Label>
               <Input type="email" value={profileForm.email} onChange={(e) => setProfileForm((f) => ({ ...f, email: e.target.value }))} />
             </div>
             {!isSuperAdminArea && (
               <div className="space-y-1.5">
-                <Label>Phone</Label>
+                <Label>{t("auth.phone")}</Label>
                 <Input value={profileForm.phone} onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
             )}
             {!isSuperAdminArea && (
               <div className="space-y-1.5">
-                <Label>Job Title</Label>
+                <Label>{t("auth.job_title")}</Label>
                 <Input value={profileForm.job_title} onChange={(e) => setProfileForm((f) => ({ ...f, job_title: e.target.value }))} />
               </div>
             )}
             <div className="space-y-1.5">
-              <Label>New Password (optional)</Label>
+              <Label>{t("auth.new_password")} (optional)</Label>
               <Input type="password" value={profileForm.password} onChange={(e) => setProfileForm((f) => ({ ...f, password: e.target.value }))} />
             </div>
           </div>
@@ -546,6 +546,9 @@ const clinicItems: DashboardItem[] = [
       { label: "Roles", labelKey: "clinic.menu.roles", to: "/clinic-dashboard/roles", icon: Shield, permissionPrefixes: ["roles", "permissions"] },
     ],
   },  
+  { label: "Doctors", labelKey: "clinic.menu.doctors", to: "/clinic-dashboard/doctors", icon: Stethoscope, permissionPrefixes: ["doctors"] },
+  { label: "Patients", labelKey: "clinic.menu.patients", to: "/clinic-dashboard/patients", icon: Users, permissionPrefixes: ["patients"] },
+
 {
     label: "Reservations Management",
     labelKey: "clinic.menu.reservations_management",
@@ -553,11 +556,12 @@ const clinicItems: DashboardItem[] = [
     icon: CalendarDays,
     permissionPrefixes: ["reservations"],
     children: [
+   { label: "Reservation Numbers", labelKey: "clinic.menu.numbers", to: "/clinic-dashboard/numbers", icon: Hash, permissionPrefixes: ["reservation-numbers", "numbers"] },
+      { label: "Reservation Slots", labelKey: "clinic.menu.slots", to: "/clinic-dashboard/slots", icon: Clock, permissionPrefixes: ["reservation-slots", "slots"] },
+
       { label: "Reservations", labelKey: "clinic.menu.reservations", to: "/clinic-dashboard/reservations", icon: List, permissionPrefixes: ["reservations"] },
       { label: "Today", labelKey: "clinic.menu.today", to: "/clinic-dashboard/today", icon: Clock, permissionPrefixes: ["reservations"] },
-      { label: "Reservation Numbers", labelKey: "clinic.menu.numbers", to: "/clinic-dashboard/numbers", icon: Hash, permissionPrefixes: ["reservation-numbers", "numbers"] },
-      { label: "Reservation Slots", labelKey: "clinic.menu.slots", to: "/clinic-dashboard/slots", icon: Clock, permissionPrefixes: ["reservation-slots", "slots"] },
-    ],
+       ],
   },
 // clinic management
   { label: "Clinic Management", labelKey: "clinic.menu.clinic_management", to: "/clinic-dashboard/clinic", icon: Stethoscope, permissionPrefixes: ["clinic"],
@@ -569,8 +573,6 @@ const clinicItems: DashboardItem[] = [
   { label: "Announcements", labelKey: "clinic.menu.announcements", to: "/clinic-dashboard/announcements", icon: Bell, permissionPrefixes: ["announcements"] },
     ],
   },
-  { label: "Doctors", labelKey: "clinic.menu.doctors", to: "/clinic-dashboard/doctors", icon: Stethoscope, permissionPrefixes: ["doctors"] },
-  { label: "Patients", labelKey: "clinic.menu.patients", to: "/clinic-dashboard/patients", icon: Users, permissionPrefixes: ["patients"] },
   { label: "Chat", labelKey: "clinic.menu.chat", to: "/clinic-dashboard/chat", icon: MessageCircle, permissionPrefixes: ["chat", "chats"] },
   { label: "Notifications", labelKey: "clinic.menu.notifications", to: "/clinic-dashboard/notifications", icon: Bell, permissionPrefixes: ["notifications"] },
   { label: "Financial", labelKey: "clinic.menu.financial", to: "/clinic-dashboard/financial", icon: FileText, permissionPrefixes: ["financial"] },

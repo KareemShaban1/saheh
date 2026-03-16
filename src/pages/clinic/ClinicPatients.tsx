@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type GlassesDistanceForm = {
   reservation_id: string;
@@ -44,6 +45,7 @@ const emptyGlassesForm = (): GlassesDistanceForm => ({
 });
 
 export default function ClinicPatients() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -126,7 +128,7 @@ export default function ClinicPatients() {
       }),
     onSuccess: async () => {
       await reloadPatients();
-      toast({ title: "Patient created and assigned to clinic" });
+      toast({ title: t("clinic.patients.patient_created_and_assigned_to_clinic") });
       setAddOpen(false);
       setAddForm({
         name: "",
@@ -139,7 +141,7 @@ export default function ClinicPatients() {
     },
     onError: (e) =>
       toast({
-        title: "Failed to create patient",
+        title: t("clinic.patients.failed_to_create_patient"),
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       }),
@@ -154,13 +156,13 @@ export default function ClinicPatients() {
       }),
     onSuccess: async () => {
       await reloadPatients();
-      toast({ title: "Existing patient assigned successfully" });
+      toast({ title: t("clinic.patients.existing_patient_assigned_successfully") });
       setAssignOpen(false);
       setAssignForm({ patient_code: "", qr_value: "", doctor_ids: [] });
     },
     onError: (e) =>
       toast({
-        title: "Failed to assign patient",
+        title: t("clinic.patients.failed_to_assign_patient"),
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       }),
@@ -169,14 +171,14 @@ export default function ClinicPatients() {
   const onSubmitAdd = () => {
     if (!addForm.name.trim() || !addForm.address.trim() || !addForm.phone.trim()) {
       toast({
-        title: "Missing required fields",
-        description: "Name, address and phone are required.",
+        title: t("clinic.patients.missing_required_fields"),
+        description: t("clinic.patients.name_address_phone_required"),
         variant: "destructive",
       });
       return;
     }
     if (addForm.doctor_ids.length === 0) {
-      toast({ title: "Select at least one doctor", variant: "destructive" });
+      toast({ title: t("clinic.patients.select_at_least_one_doctor"), variant: "destructive" });
       return;
     }
     createPatientMutation.mutate();
@@ -184,11 +186,11 @@ export default function ClinicPatients() {
 
   const onSubmitAssign = () => {
     if (!assignForm.patient_code.trim() && !assignForm.qr_value.trim()) {
-      toast({ title: "Enter patient code or QR value", variant: "destructive" });
+      toast({ title: t("clinic.patients.enter_patient_code_or_qr_value"), variant: "destructive" });
       return;
     }
     if (assignForm.doctor_ids.length === 0) {
-      toast({ title: "Select at least one doctor", variant: "destructive" });
+      toast({ title: t("clinic.patients.select_at_least_one_doctor"), variant: "destructive" });
       return;
     }
     assignPatientMutation.mutate();
@@ -216,7 +218,7 @@ export default function ClinicPatients() {
     },
     onSuccess: async () => {
       if (!activePatient) return;
-      toast({ title: "Glasses distance saved" });
+      toast({ title: t("clinic.patients.glasses_distance_saved") });
       const res = await clinicApi.patientGlassesDistances(activePatient.id);
       const root = (res as { data?: unknown })?.data ?? res;
       setGlassesHistory(Array.isArray(root) ? (root as Array<{ id: number | string; created_at?: string | null; reservation_id?: number | null } & Omit<GlassesDistanceForm, "reservation_id">>) : []);
@@ -224,7 +226,7 @@ export default function ClinicPatients() {
     },
     onError: (e) =>
       toast({
-        title: "Failed to save glasses distance",
+        title: t("clinic.patients.failed_to_save_glasses_distance"),
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       }),
@@ -241,7 +243,7 @@ export default function ClinicPatients() {
       setGlassesHistory(Array.isArray(root) ? (root as Array<{ id: number | string; created_at?: string | null; reservation_id?: number | null } & Omit<GlassesDistanceForm, "reservation_id">>) : []);
     } catch (e) {
       toast({
-        title: "Failed to load glasses records",
+        title: t("clinic.patients.failed_to_load_glasses_records"),
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
@@ -287,7 +289,7 @@ export default function ClinicPatients() {
       setScanMessage("Point camera to patient QR code");
     } catch (e) {
       toast({
-        title: "Cannot start camera scan",
+        title: t("clinic.patients.cannot_start_camera_scan"),
         description: e instanceof Error ? e.message : "Please allow camera access and try again.",
         variant: "destructive",
       });
@@ -307,17 +309,16 @@ export default function ClinicPatients() {
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold mb-1">Patients</h2>
-          <p className="text-muted-foreground text-sm">Search patients and manage patient profile</p>
+          <h2 className="text-2xl font-bold mb-1">{t("clinic.patients.title")}</h2>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setAssignOpen(true)}>Assign Existing (Code / QR)</Button>
-          <Button onClick={() => setAddOpen(true)} className="gradient-primary text-primary-foreground border-0 gap-2">
+          <Button variant="outline" onClick={() => setAssignOpen(true)}>{t("clinic.patients.assign_existing_code_qr")}</Button>
+          {/* <Button onClick={() => setAddOpen(true)} className="gradient-primary text-primary-foreground border-0 gap-2">
             <Plus className="h-4 w-4" />
-            Add Patient
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/clinic-dashboard/patients/new">Open Full Form</Link>
+            {t("clinic.patients.add_patient")}
+          </Button> */}
+          <Button asChild variant="outline"  className="gradient-primary text-primary-foreground border-0 gap-2">
+            <Link to="/clinic-dashboard/patients/new">{t("clinic.patients.add_patient")}</Link>
           </Button>
         </div>
       </div>
@@ -325,7 +326,7 @@ export default function ClinicPatients() {
       <div className="relative max-w-sm mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name or phone..."
+          placeholder={t("clinic.patients.search_by_name_or_phone")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -341,29 +342,29 @@ export default function ClinicPatients() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-start font-medium p-4 text-muted-foreground">#</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Patient</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Phone</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Email</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Assigned Doctors</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Actions</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.patients.patient")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.patients.phone")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.patients.email")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.patients.assigned_doctors")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.patients.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {isLoading && (
                 <tr>
-                  <td className="p-4 text-muted-foreground" colSpan={6}>Loading patients...</td>
+                  <td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.patients.loading_patients")}</td>
                 </tr>
               )}
               {error && (
                 <tr>
                   <td className="p-4 text-destructive" colSpan={6}>
-                    {error instanceof Error ? error.message : "Failed to load patients"}
+                    {error instanceof Error ? error.message : t("clinic.patients.failed_to_load_patients")}
                   </td>
                 </tr>
               )}
               {!isLoading && !error && paged.length === 0 && (
                 <tr>
-                  <td className="p-4 text-muted-foreground" colSpan={6}>No patients found.</td>
+                  <td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.patients.no_patients_found")}</td>
                 </tr>
               )}
               {paged.map((p) => (
@@ -382,21 +383,21 @@ export default function ClinicPatients() {
                       <Button asChild size="sm" variant="outline" className="gap-2">
                         <Link to={`/clinic-dashboard/patients/${p.id}/edit`}>
                           <Edit className="h-4 w-4" />
-                          Edit
+                          {t("clinic.patients.edit")}
                         </Link>
                       </Button>
                       <Button asChild size="sm" variant="outline">
-                        <Link to={`/clinic-dashboard/patients/${p.id}/history`}>History</Link>
+                        <Link to={`/clinic-dashboard/patients/${p.id}/history`}>{t("clinic.patients.history")}</Link>
                       </Button>
                       <Button asChild size="sm" className="gap-2 gradient-primary text-primary-foreground border-0">
                         <Link to={`/clinic-dashboard/reservations/new?patient_id=${p.id}`}>
                           <Plus className="h-4 w-4" />
-                          Add Reservation
+                          {t("clinic.patients.add_reservation")}
                         </Link>
                       </Button>
                       <Button size="sm" variant="outline" className="gap-2" onClick={() => void openPatientGlassesModal({ id: p.id, name: p.name })}>
                         <Glasses className="h-4 w-4" />
-                        Glasses
+                        {t("clinic.patients.glasses")}
                       </Button>
                     </div>
                   </td>
@@ -407,10 +408,10 @@ export default function ClinicPatients() {
         </div>
         {!isLoading && !error && totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t">
-            <p className="text-sm text-muted-foreground">Page {safePage} of {totalPages}</p>
+            <p className="text-sm text-muted-foreground">{t("clinic.patients.page")} {safePage} {t("clinic.patients.of")} {totalPages}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}>
-                Previous
+                {t("clinic.patients.previous")}
               </Button>
               <Button
                 variant="outline"
@@ -418,7 +419,7 @@ export default function ClinicPatients() {
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={safePage >= totalPages}
               >
-                Next
+                {t("clinic.patients.next")}
               </Button>
             </div>
           </div>
@@ -427,42 +428,42 @@ export default function ClinicPatients() {
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-xl">
-          <DialogHeader><DialogTitle>Add Patient</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("clinic.patients.add_patient")}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Name *</Label>
+                <Label>{t("clinic.patients.name")} *</Label>
                 <Input value={addForm.name} onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <Label>Phone *</Label>
+                <Label>{t("clinic.patients.phone")} *</Label>
                 <Input value={addForm.phone} onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Address *</Label>
+              <Label>{t("clinic.patients.address")} *</Label>
               <Input value={addForm.address} onChange={(e) => setAddForm((f) => ({ ...f, address: e.target.value }))} />
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Email</Label>
+                <Label>{t("clinic.patients.email")}</Label>
                 <Input value={addForm.email} onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <Label>Gender</Label>
+                <Label>{t("clinic.patients.gender")}</Label>
                 <select
                   title="Patient gender"
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   value={addForm.gender}
                   onChange={(e) => setAddForm((f) => ({ ...f, gender: e.target.value as "male" | "female" }))}
                 >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
+                  <option value="male">{t("clinic.patients.male")}</option>
+                  <option value="female">{t("clinic.patients.female")}</option>
                 </select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Assign Doctors *</Label>
+              <Label>{t("clinic.patients.assign_doctors")} *</Label>
               <div className="max-h-40 overflow-y-auto rounded-md border p-3 space-y-2">
                 {doctors.map((d) => {
                   const doctorId = String(d.id);
@@ -489,8 +490,8 @@ export default function ClinicPatients() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={onSubmitAdd} disabled={createPatientMutation.isPending}>Save</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>{t("clinic.patients.cancel")}</Button>
+            <Button onClick={onSubmitAdd} disabled={createPatientMutation.isPending}>{t("clinic.patients.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -498,24 +499,24 @@ export default function ClinicPatients() {
       <Dialog open={glassesOpen} onOpenChange={setGlassesOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Glasses Distance {activePatient ? `for ${activePatient.name ?? `Patient #${activePatient.id}`}` : ""}</DialogTitle>
+            <DialogTitle>{t("clinic.patients.glasses_distance")} {activePatient ? `for ${activePatient.name ?? `Patient #${activePatient.id}`}` : ""}</DialogTitle>
           </DialogHeader>
           {glassesLoading ? (
-            <p className="text-sm text-muted-foreground">Loading glasses records...</p>
+            <p className="text-sm text-muted-foreground">{t("clinic.patients.loading_glasses_records")}</p>
           ) : (
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
               <div className="space-y-1">
-                <Label htmlFor="patient-glasses-reservation-id">Reservation ID (optional)</Label>
+                <Label htmlFor="patient-glasses-reservation-id">{t("clinic.patients.reservation_id")} (optional)</Label>
                 <Input
                   id="patient-glasses-reservation-id"
-                  placeholder="Leave empty if not linked to reservation"
+                  placeholder={t("clinic.patients.leave_empty_if_not_linked_to_reservation")}
                   value={glassesForm.reservation_id}
                   onChange={(e) => setGlassesForm((p) => ({ ...p, reservation_id: e.target.value }))}
                 />
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-3 rounded-lg border p-3">
-                  <p className="text-sm font-medium">Distance (D)</p>
+                  <p className="text-sm font-medium">{t("clinic.patients.distance")} (D)</p>
                   <div className="grid grid-cols-3 gap-2">
                     <Input placeholder="SPH R" value={glassesForm.SPH_R_D} onChange={(e) => setGlassesForm((p) => ({ ...p, SPH_R_D: e.target.value }))} />
                     <Input placeholder="CYL R" value={glassesForm.CYL_R_D} onChange={(e) => setGlassesForm((p) => ({ ...p, CYL_R_D: e.target.value }))} />
@@ -539,15 +540,15 @@ export default function ClinicPatients() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium">Recent Records</p>
+                <p className="text-sm font-medium">{t("clinic.patients.recent_records")}</p>
                 {glassesHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No glasses records yet.</p>
+                  <p className="text-sm text-muted-foreground">{t("clinic.patients.no_glasses_records_yet")}</p>
                 ) : (
                   <div className="space-y-2">
                     {glassesHistory.slice(0, 5).map((row) => (
                       <div key={String(row.id)} className="rounded-md border p-2 text-xs">
                         <p className="text-muted-foreground mb-1">
-                          {row.created_at ?? "—"} {row.reservation_id ? `• Reservation #${row.reservation_id}` : ""}
+                          {row.created_at ?? "—"} {row.reservation_id ? `• ${t("clinic.patients.reservation")} #${row.reservation_id}` : ""}
                         </p>
                         <p>D: R({row.SPH_R_D || "—"}/{row.CYL_R_D || "—"}/{row.AX_R_D || "—"}) L({row.SPH_L_D || "—"}/{row.CYL_L_D || "—"}/{row.AX_L_D || "—"})</p>
                         <p>N: R({row.SPH_R_N || "—"}/{row.CYL_R_N || "—"}/{row.AX_R_N || "—"}) L({row.SPH_L_N || "—"}/{row.CYL_L_N || "—"}/{row.AX_L_N || "—"})</p>
@@ -559,9 +560,9 @@ export default function ClinicPatients() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setGlassesOpen(false)} disabled={savePatientGlassesMutation.isPending}>Cancel</Button>
+            <Button variant="outline" onClick={() => setGlassesOpen(false)} disabled={savePatientGlassesMutation.isPending}>{t("clinic.patients.cancel")}</Button>
             <Button onClick={() => savePatientGlassesMutation.mutate()} disabled={savePatientGlassesMutation.isPending || glassesLoading}>
-              {savePatientGlassesMutation.isPending ? "Saving..." : "Save Glasses Data"}
+              {savePatientGlassesMutation.isPending ? t("clinic.patients.saving") : t("clinic.patients.save_glasses_data")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -569,10 +570,10 @@ export default function ClinicPatients() {
 
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="sm:max-w-xl">
-          <DialogHeader><DialogTitle>Assign Existing Patient</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("clinic.patients.assign_existing_patient")}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Patient Code</Label>
+              <Label>{t("clinic.patients.patient_code")}</Label>
               <Input
                 placeholder="Example: 20260001"
                 value={assignForm.patient_code}
@@ -580,27 +581,23 @@ export default function ClinicPatients() {
               />
             </div>
             <div className="space-y-1">
-              <Label>QR Value (scanned text)</Label>
-              <Input
-                placeholder="Paste scanned QR content"
-                value={assignForm.qr_value}
-                onChange={(e) => setAssignForm((f) => ({ ...f, qr_value: e.target.value }))}
-              />
+              <Label>{t("clinic.patients.qr_value")} {t("clinic.patients.scanned_text")}</Label>
+              <Input placeholder={t("clinic.patients.paste_scanned_qr_content")} value={assignForm.qr_value} onChange={(e) => setAssignForm((f) => ({ ...f, qr_value: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>Scan with Camera</Label>
+              <Label>{t("clinic.patients.scan_with_camera")} {t("clinic.patients.scan_with_camera")}</Label>
               <video ref={videoRef} className="w-full max-h-64 rounded-md border bg-black/90" muted playsInline />
               <div className="flex gap-2">
                 {!isScanning ? (
-                  <Button type="button" variant="outline" onClick={() => void startScanner()}>Start Camera Scan</Button>
+                  <Button type="button" variant="outline" onClick={() => void startScanner()}>{t("clinic.patients.start_camera_scan")}</Button>
                 ) : (
-                  <Button type="button" variant="outline" onClick={stopScanner}>Stop Camera</Button>
+                  <Button type="button" variant="outline" onClick={stopScanner}>{t("clinic.patients.stop_camera")}</Button>
                 )}
                 {scanMessage ? <p className="text-xs text-muted-foreground self-center">{scanMessage}</p> : null}
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Assign Doctors *</Label>
+              <Label>{t("clinic.patients.assign_doctors")} *</Label>
               <div className="max-h-40 overflow-y-auto rounded-md border p-3 space-y-2">
                 {doctors.map((d) => {
                   const doctorId = String(d.id);
@@ -627,8 +624,8 @@ export default function ClinicPatients() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignOpen(false)}>Cancel</Button>
-            <Button onClick={onSubmitAssign} disabled={assignPatientMutation.isPending}>Assign</Button>
+            <Button variant="outline" onClick={() => setAssignOpen(false)}>{t("clinic.patients.cancel")}</Button>
+            <Button onClick={onSubmitAssign} disabled={assignPatientMutation.isPending}>{t("clinic.patients.assign")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

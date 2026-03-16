@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type FinancialSummary = {
   total_revenue?: number;
@@ -34,6 +35,7 @@ type FinancialModulePageProps = {
 };
 
 export default function FinancialModulePage({ title, description, queryKeyBase, queryFn }: FinancialModulePageProps) {
+  const { t } = useLanguage();
   const [months, setMonths] = useState(6);
   const { data, isLoading, error } = useQuery({
     queryKey: [...queryKeyBase, months],
@@ -68,45 +70,44 @@ export default function FinancialModulePage({ title, description, queryKeyBase, 
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold">{title}</h2>
-          <p className="text-sm text-muted-foreground mt-1">{description}</p>
         </div>
         <div className="w-44">
           <Select value={String(months)} onValueChange={(value) => setMonths(Number(value))}>
             <SelectTrigger>
-              <SelectValue placeholder="Period" />
+              <SelectValue placeholder={t("financial.period")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="3">Last 3 months</SelectItem>
-              <SelectItem value="6">Last 6 months</SelectItem>
-              <SelectItem value="12">Last 12 months</SelectItem>
+              <SelectItem value="3">{t("financial.last_3_months")}</SelectItem>
+              <SelectItem value="6">{t("financial.last_6_months")}</SelectItem>
+              <SelectItem value="12">{t("financial.last_12_months")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {isLoading && <Card><CardContent className="p-6 text-muted-foreground">Loading financial data...</CardContent></Card>}
-      {error && <Card><CardContent className="p-6 text-destructive">{error instanceof Error ? error.message : "Failed to load financial data"}</CardContent></Card>}
+      {isLoading && <Card><CardContent className="p-6 text-muted-foreground">{t("financial.loading_financial_data")}</CardContent></Card>}
+      {error && <Card><CardContent className="p-6 text-destructive">{error instanceof Error ? error.message : t("financial.failed_to_load_financial_data")}</CardContent></Card>}
 
       {!isLoading && !error && (
         <>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card><CardHeader><CardTitle className="text-sm">Total Revenue</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{money(summary.total_revenue)}</CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-sm">Total Due</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{money(summary.total_due)}</CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-sm">Paid Records</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{summary.paid_count ?? 0}</CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-sm">Unpaid Records</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{summary.unpaid_count ?? 0}</CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-sm">{t("financial.total_revenue")}</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{money(summary.total_revenue)}</CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-sm">{t("financial.total_due")}</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{money(summary.total_due)}</CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-sm">{t("financial.paid_records")}</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{summary.paid_count ?? 0}</CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-sm">{t("financial.unpaid_records")}</CardTitle></CardHeader><CardContent className="text-2xl font-semibold">{summary.unpaid_count ?? 0}</CardContent></Card>
           </div>
 
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-base">Revenue Trend</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{t("financial.revenue_trend")}</CardTitle></CardHeader>
               <CardContent>
                 <ChartContainer
                   config={{
-                    revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
-                    due: { label: "Due", color: "hsl(var(--chart-2))" },
-                    clinic: { label: "Clinic", color: "hsl(var(--chart-3))" },
-                    lab: { label: "Lab", color: "hsl(var(--chart-4))" },
-                    radiology: { label: "Radiology", color: "hsl(var(--chart-5))" },
+                    revenue: { label: t("financial.revenue"), color: "hsl(var(--chart-1))" },
+                    due: { label: t("financial.due"), color: "hsl(var(--chart-2))" },
+                    clinic: { label: t("financial.clinic"), color: "hsl(var(--chart-3))" },
+                    lab: { label: t("financial.lab"), color: "hsl(var(--chart-4))" },
+                    radiology: { label: t("financial.radiology"), color: "hsl(var(--chart-5))" },
                   }}
                   className="h-72 w-full"
                 >
@@ -135,15 +136,15 @@ export default function FinancialModulePage({ title, description, queryKeyBase, 
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base">Breakdown</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{t("financial.breakdown")}</CardTitle></CardHeader>
               <CardContent>
                 <ChartContainer
                   config={{
-                    paid: { label: "Paid", color: "hsl(var(--chart-1))" },
-                    due: { label: "Due", color: "hsl(var(--chart-2))" },
-                    clinic: { label: "Clinic", color: "hsl(var(--chart-3))" },
-                    laboratory: { label: "Laboratory", color: "hsl(var(--chart-4))" },
-                    radiology: { label: "Radiology", color: "hsl(var(--chart-5))" },
+                    paid: { label: t("financial.paid"), color: "hsl(var(--chart-1))" },
+                    due: { label: t("financial.due"), color: "hsl(var(--chart-2))" },
+                    clinic: { label: t("financial.clinic"), color: "hsl(var(--chart-3))" },
+                    laboratory: { label: t("financial.laboratory"), color: "hsl(var(--chart-4))" },
+                    radiology: { label: t("financial.radiology"), color: "hsl(var(--chart-5))" },
                   }}
                   className="h-72 w-full"
                 >
