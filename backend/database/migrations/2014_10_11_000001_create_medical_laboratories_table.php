@@ -34,11 +34,9 @@ return new class extends Migration
             //     ->nullable()->references('id')
             //     ->on('specialties')->nullOnDelete();
             $table->string('website')->nullable();
-            $table->string('domain')->nullable();
-            $table->string('database')->nullable();
             $table->text('description')->nullable();
-            $table->string('logo')->nullable();
-            $table->boolean('status')->default(1);
+            $table->boolean('is_active')->default(0);
+	  $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->string('latitude')->nullable();
             $table->string('longitude')->nullable();
             $table->timestamps();

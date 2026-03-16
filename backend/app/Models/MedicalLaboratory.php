@@ -28,6 +28,9 @@ class MedicalLaboratory extends Model
         'description',
         'logo',
         'status',
+        'is_active',
+        'latitude',
+        'longitude',
     ];
 
     public function patients(){

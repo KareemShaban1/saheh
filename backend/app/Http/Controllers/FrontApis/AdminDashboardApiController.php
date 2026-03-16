@@ -152,7 +152,8 @@ class AdminDashboardApiController extends Controller
             'users_count' => $c->users_count ?? 0,
             'doctors_count' => $c->doctors_count ?? 0,
             'patients_count' => $c->patients_count ?? 0,
-            'status' => $c->status ?? 1,
+            'status' => $this->normalizeOrganizationStatus($c->status),
+            'is_active' => (int) ($c->is_active ?? 0),
         ]);
         return $this->returnJSON([
             'data' => $data,
@@ -175,7 +176,7 @@ class AdminDashboardApiController extends Controller
             'address' => $clinic->address,
             'website' => $clinic->website,
             'description' => $clinic->description,
-            'status' => (int) ($clinic->status ?? 1),
+            'status' => $this->normalizeOrganizationStatus($clinic->status),
             'is_active' => (int) ($clinic->is_active ?? 1),
             'specialty' => $clinic->specialty,
             'governorate' => $clinic->governorate,
@@ -199,7 +200,8 @@ class AdminDashboardApiController extends Controller
             'address' => 'nullable|string|max:500',
             'description' => 'nullable|string',
             'website' => 'nullable|string|max:255',
-            'status' => 'nullable|in:active,inactive',
+            'status' => 'nullable|in:pending,approved,rejected',
+            'is_active' => 'nullable|boolean',
             'specialty_id' => 'nullable|integer|exists:specialties,id',
             'governorate_id' => 'nullable|integer|exists:governorates,id',
             'city_id' => 'nullable|integer|exists:cities,id',
@@ -217,14 +219,15 @@ class AdminDashboardApiController extends Controller
             'governorate_id' => $payload['governorate_id'] ?? null,
             'city_id' => $payload['city_id'] ?? null,
             'area_id' => $payload['area_id'] ?? null,
-            'status' => ($payload['status'] ?? 'active') === 'active' ? 1 : 0,
-            'is_active' => ($payload['status'] ?? 'active') === 'active' ? 1 : 0,
+            'status' => $payload['status'] ?? 'approved',
+            'is_active' => array_key_exists('is_active', $payload) ? (int) (bool) $payload['is_active'] : 1,
         ]);
 
         return $this->returnJSON([
             'id' => $clinic->id,
             'name' => $clinic->name,
-            'status' => (int) ($clinic->status ?? 1),
+            'status' => $this->normalizeOrganizationStatus($clinic->status),
+            'is_active' => (int) ($clinic->is_active ?? 0),
         ], 'Clinic created successfully', 'success');
     }
 
@@ -233,18 +236,24 @@ class AdminDashboardApiController extends Controller
         $this->ensureAdminAuth();
 
         $payload = $request->validate([
-            'status' => 'required|in:active,inactive',
+            'status' => 'nullable|in:pending,approved,rejected',
+            'is_active' => 'nullable|boolean',
         ]);
 
         $clinic = Clinic::findOrFail($id);
-        $isActive = $payload['status'] === 'active';
-        $clinic->status = $isActive ? 1 : 0;
-        $clinic->is_active = $isActive ? 1 : 0;
+
+        if (array_key_exists('status', $payload)) {
+            $clinic->status = $payload['status'];
+        }
+        if (array_key_exists('is_active', $payload)) {
+            $clinic->is_active = (int) (bool) $payload['is_active'];
+        }
         $clinic->save();
 
         return $this->returnJSON([
             'id' => $clinic->id,
-            'status' => (int) $clinic->status,
+            'status' => $this->normalizeOrganizationStatus($clinic->status),
+            'is_active' => (int) ($clinic->is_active ?? 0),
         ], 'Clinic status updated', 'success');
     }
 
@@ -1026,5 +1035,22 @@ class AdminDashboardApiController extends Controller
             'per_page' => $paginated->perPage(),
             'total' => $paginated->total(),
         ];
+    }
+
+    private function normalizeOrganizationStatus(mixed $status): string
+    {
+        if (is_numeric($status)) {
+            return ((int) $status) === 1 ? 'approved' : 'pending';
+        }
+
+        if (!is_string($status)) {
+            return 'pending';
+        }
+
+        return match ($status) {
+            'active', 'approved', '1' => 'approved',
+            'rejected' => 'rejected',
+            default => 'pending',
+        };
     }
 }
