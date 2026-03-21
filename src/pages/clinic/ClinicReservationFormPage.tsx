@@ -16,11 +16,17 @@ type ReservationForm = {
 	date: string;
 	reservation_value: string;
 	status: "waiting" | "entered" | "finished" | "cancelled";
-	payment: "paid" | "not_paid" | "unpaid";
 	acceptance: "pending" | "approved" | "not_approved";
+	payment: "paid" | "not_paid" | "partially_paid";
 	month: string;
 	first_diagnosis: string;
 	final_diagnosis: string;
+};
+
+type PaymentRow = {
+	date: string;
+	amount: string;
+	payment_way: "cash";
 };
 
 type ServiceRow = {
@@ -49,6 +55,21 @@ function monthFromDate(date: string): string {
 	return parts[1] ?? "";
 }
 
+function toDateInputValue(value?: string | null): string {
+	if (!value) return "";
+	// HTML datetime-local accepts YYYY-MM-DDTHH:mm.
+	// API may return "YYYY-MM-DD HH:mm:ss" or ISO format.
+	if (value.includes(" ")) {
+		const [d, t] = value.split(" ");
+		return `${d}T${(t ?? "00:00:00").slice(0, 5)}`;
+	}
+	if (value.includes("T")) {
+		const [d, t] = value.split("T");
+		return `${d}T${(t ?? "00:00:00").slice(0, 5)}`;
+	}
+	return `${value}T00:00`;
+}
+
 export default function ClinicReservationFormPage() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -64,14 +85,42 @@ export default function ClinicReservationFormPage() {
 		date: "",
 		reservation_value: "",
 		status: "waiting",
-		payment: "not_paid",
 		acceptance: "approved",
+		payment: "not_paid",
 		month: "",
 		first_diagnosis: "",
 		final_diagnosis: "",
 	});
+	const [isPaymentStatusManual, setIsPaymentStatusManual] = useState(false);
+	const [payments, setPayments] = useState<PaymentRow[]>([]);
 	const [reservationMode, setReservationMode] = useState<"numbers" | "slots">("numbers");
 	const [Services, setServices] = useState<ServiceRow[]>([]);
+	const totalServicesCost = useMemo(
+		() => Services.reduce((sum, row) => sum + Number(row.fee || 0), 0),
+		[Services],
+	);
+	const paymentRowsWithRemaining = useMemo(() => {
+		let runningPaid = 0;
+		return payments.map((row) => {
+			runningPaid += Number(row.amount || 0);
+			return {
+				...row,
+				remaining: totalServicesCost - runningPaid,
+			};
+		});
+	}, [payments, totalServicesCost]);
+	const currentRemaining = useMemo(() => {
+		const latest = paymentRowsWithRemaining[paymentRowsWithRemaining.length - 1]?.remaining;
+		if (typeof latest === "number" && Number.isFinite(latest)) {
+			return Math.max(0, latest);
+		}
+		return Math.max(0, totalServicesCost);
+	}, [paymentRowsWithRemaining, totalServicesCost]);
+	const autoPaymentStatus = useMemo<ReservationForm["payment"]>(() => {
+		if (currentRemaining <= 0) return "paid";
+		if (currentRemaining >= totalServicesCost) return "not_paid";
+		return "partially_paid";
+	}, [currentRemaining, totalServicesCost]);
 	const [pendingVoiceRecords, setPendingVoiceRecords] = useState<PendingVoiceRecord[]>([]);
 	const [existingVoiceRecords, setExistingVoiceRecords] = useState<VoiceRecord[]>([]);
 	const [removedVoiceRecordIds, setRemovedVoiceRecordIds] = useState<number[]>([]);
@@ -164,6 +213,11 @@ export default function ClinicReservationFormPage() {
 	}, [form.date]);
 
 	useEffect(() => {
+		if (isPaymentStatusManual) return;
+		setForm((prev) => (prev.payment === autoPaymentStatus ? prev : { ...prev, payment: autoPaymentStatus }));
+	}, [autoPaymentStatus, isPaymentStatusManual]);
+
+	useEffect(() => {
 		if (!isEdit || !reservationDetailsQuery.data) return;
 		const root = (reservationDetailsQuery.data as { data?: unknown })?.data ?? reservationDetailsQuery.data;
 		const details = root as {
@@ -173,11 +227,12 @@ export default function ClinicReservationFormPage() {
 			reservation_number?: string | number | null;
 			slot?: string | null;
 			status?: ReservationForm["status"];
-			payment?: ReservationForm["payment"];
 			acceptance?: ReservationForm["acceptance"];
+			payment?: ReservationForm["payment"];
 			month?: string;
 			first_diagnosis?: string | null;
 			final_diagnosis?: string | null;
+			payment_history?: Array<{ date?: string; amount?: number; remaining?: number; payment_way?: string | null }>;
 			voice_records?: Array<{ id: number; url: string; file_name?: string; size?: number }>;
 			reservation_mode?: "numbers" | "slots";
 			services?: Array<{ service_fee_id?: number; fee?: number; notes?: string }>;
@@ -194,12 +249,20 @@ export default function ClinicReservationFormPage() {
 			date: details.date ?? "",
 			reservation_value: reservationValue,
 			status: details.status ?? "waiting",
-			payment: details.payment ?? "not_paid",
 			acceptance: details.acceptance ?? "approved",
+			payment: details.payment ?? "not_paid",
 			month: details.month ?? monthFromDate(details.date ?? ""),
 			first_diagnosis: details.first_diagnosis ?? "",
 			final_diagnosis: details.final_diagnosis ?? "",
 		});
+		setIsPaymentStatusManual(false);
+		setPayments(
+			(details.payment_history ?? []).map((row) => ({
+				date: toDateInputValue(row.date),
+				amount: String(row.amount ?? 0),
+				payment_way: "cash",
+			})),
+		);
 		setReservationMode(details.reservation_mode ?? (details.reservation_number ? "numbers" : "slots"));
 		setServices(
 			(details.services ?? []).map((sf) => ({
@@ -259,6 +322,19 @@ export default function ClinicReservationFormPage() {
 
 	const mutation = useMutation({
 		mutationFn: async () => {
+			const detailsRoot = (reservationDetailsQuery.data as { data?: unknown })?.data ?? reservationDetailsQuery.data;
+			const details = (detailsRoot ?? {}) as {
+				patient_id?: number | string;
+				doctor_id?: number | string;
+				reservation_number?: string | number | null;
+				slot?: string | null;
+			};
+			const effectivePatientId = String(form.patient_id || details.patient_id || "");
+			const effectiveDoctorId = String(form.doctor_id || details.doctor_id || "");
+			const effectiveReservationValue = String(
+				form.reservation_value || details.reservation_number || details.slot || "",
+			);
+
 			const services = Services
 				.filter((sf) => sf.service_fee_id)
 				.map((sf) => ({
@@ -268,18 +344,31 @@ export default function ClinicReservationFormPage() {
 				}));
 
 			const payload = new FormData();
-			payload.append("patient_id", String(Number(form.patient_id)));
-			payload.append("doctor_id", String(Number(form.doctor_id)));
+			payload.append("patient_id", String(Number(effectivePatientId)));
+			payload.append("doctor_id", String(Number(effectiveDoctorId)));
 			payload.append("date", form.date);
 			payload.append("status", form.status);
-			payload.append("payment", form.payment);
 			payload.append("acceptance", form.acceptance);
+			payload.append("payment", form.payment);
 			payload.append("month", form.month);
-			payload.append("reservation_number", reservationMode === "numbers" ? form.reservation_value : "");
-			payload.append("slot", reservationMode === "slots" ? form.reservation_value : "");
+			payload.append("reservation_number", reservationMode === "numbers" ? effectiveReservationValue : "");
+			payload.append("slot", reservationMode === "slots" ? effectiveReservationValue : "");
 			payload.append("first_diagnosis", form.first_diagnosis.trim());
 			payload.append("final_diagnosis", form.final_diagnosis.trim());
 			payload.append("services", JSON.stringify(services));
+			payload.append(
+				"payments",
+				JSON.stringify(
+					payments
+						.filter((item) => item.date && item.amount !== "")
+						.map((item, index) => ({
+							date: item.date,
+							amount: Number(item.amount || 0),
+							remaining: Number(paymentRowsWithRemaining[index]?.remaining ?? totalServicesCost),
+							payment_way: item.payment_way || undefined,
+						})),
+				),
+			);
 			if (removedVoiceRecordIds.length > 0) {
 				payload.append("remove_voice_record_ids", JSON.stringify(removedVoiceRecordIds));
 			}
@@ -324,7 +413,20 @@ export default function ClinicReservationFormPage() {
 	};
 
 	const onSubmit = () => {
-		if (!form.patient_id || !form.doctor_id || !form.date || !form.reservation_value) {
+		const detailsRoot = (reservationDetailsQuery.data as { data?: unknown })?.data ?? reservationDetailsQuery.data;
+		const details = (detailsRoot ?? {}) as {
+			patient_id?: number | string;
+			doctor_id?: number | string;
+			reservation_number?: string | number | null;
+			slot?: string | null;
+		};
+		const effectivePatientId = String(form.patient_id || details.patient_id || "");
+		const effectiveDoctorId = String(form.doctor_id || details.doctor_id || "");
+		const effectiveReservationValue = String(
+			form.reservation_value || details.reservation_number || details.slot || "",
+		);
+
+		if (!effectivePatientId || !effectiveDoctorId || !form.date || !effectiveReservationValue) {
 			toast({
 				title: "Missing required fields",
 				description: "Patient, doctor, date and reservation value are required.",
@@ -468,6 +570,7 @@ export default function ClinicReservationFormPage() {
 							onValueChange={(v) => {
 								setForm((f) => ({ ...f, doctor_id: v, reservation_value: "" }));
 								setServices([]);
+				setPayments([]);
 							}}
 						>
 							<SelectTrigger><SelectValue placeholder="Select doctor" /></SelectTrigger>
@@ -517,16 +620,6 @@ export default function ClinicReservationFormPage() {
 
 				<div className="grid sm:grid-cols-3 gap-4">
 					<div className="space-y-2">
-						<Label>Payment *</Label>
-						<Select value={form.payment} onValueChange={(v) => setForm((f) => ({ ...f, payment: v as ReservationForm["payment"] }))}>
-							<SelectTrigger><SelectValue /></SelectTrigger>
-							<SelectContent>
-								<SelectItem value="paid">paid</SelectItem>
-								<SelectItem value="not_paid">unpaid</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-					<div className="space-y-2">
 						<Label>Status *</Label>
 						<Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v as ReservationForm["status"] }))}>
 							<SelectTrigger><SelectValue /></SelectTrigger>
@@ -549,69 +642,44 @@ export default function ClinicReservationFormPage() {
 							</SelectContent>
 						</Select>
 					</div>
+					<div className="space-y-2">
+						<div className="flex items-center justify-between">
+							<Label>Payment Status *</Label>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => {
+									setIsPaymentStatusManual(false);
+									setForm((prev) => ({ ...prev, payment: autoPaymentStatus }));
+								}}
+							>
+								Auto
+							</Button>
+						</div>
+						<Select
+							value={form.payment}
+							onValueChange={(v) => {
+								setIsPaymentStatusManual(true);
+								setForm((f) => ({ ...f, payment: v as ReservationForm["payment"] }));
+							}}
+						>
+							<SelectTrigger><SelectValue /></SelectTrigger>
+							<SelectContent>
+								<SelectItem value="not_paid">not_paid</SelectItem>
+								<SelectItem value="partially_paid">partially_paid</SelectItem>
+								<SelectItem value="paid">paid</SelectItem>
+							</SelectContent>
+						</Select>
+						<p className="text-xs text-muted-foreground">
+							Auto by remaining ({currentRemaining}) vs total cost ({totalServicesCost}).
+						</p>
+					</div>
 				</div>
 
-				<div className="space-y-2">
-					<div className="flex items-center justify-between">
-						<Label>Services</Label>
-						<Button type="button" size="sm" variant="outline" className="gap-2" onClick={onAddService} disabled={!form.doctor_id}>
-							<Plus className="h-4 w-4" />
-							Add Service
-						</Button>
-					</div>
-					{doctorServicesQuery.isLoading && form.doctor_id && (
-						<p className="text-xs text-muted-foreground">Loading doctor services...</p>
-					)}
-					{Services.length === 0 && (
-						<p className="text-xs text-muted-foreground">No service rows yet.</p>
-					)}
-					{Services.map((sf, idx) => (
-						<div key={`${idx}-${sf.service_fee_id}`} className="grid grid-cols-12 gap-2 items-start border rounded-lg p-2">
-							<div className="col-span-12 md:col-span-5 space-y-1">
-								<Label className="text-xs">Service</Label>
-								<Select value={sf.service_fee_id} onValueChange={(v) => onPickService(idx, v)}>
-									<SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger>
-									<SelectContent>
-										{availableServices.map((item) => (
-											<SelectItem key={String(item.id)} value={String(item.id)}>
-												{item.service_name ?? `Service ${item.id}`}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							<div className="col-span-12 md:col-span-3 space-y-1">
-								<Label className="text-xs">Cost</Label>
-								<Input
-									type="number"
-									value={sf.fee}
-									onChange={(e) =>
-										setServices((prev) =>
-											prev.map((row, i) => (i === idx ? { ...row, fee: e.target.value } : row)),
-										)
-									}
-								/>
-							</div>
-							<div className="col-span-12 md:col-span-3 space-y-1">
-								<Label className="text-xs">Notes</Label>
-								<Textarea
-									rows={1}
-									value={sf.notes}
-									onChange={(e) =>
-										setServices((prev) =>
-											prev.map((row, i) => (i === idx ? { ...row, notes: e.target.value } : row)),
-										)
-									}
-								/>
-							</div>
-							<div className="col-span-12 md:col-span-1 pt-5">
-								<Button type="button" size="icon" variant="ghost" onClick={() => onRemoveService(idx)}>
-									<Trash2 className="h-4 w-4 text-destructive" />
-								</Button>
-							</div>
-						</div>
-					))}
-				</div>
+			
+
+				
 
 				<div className="grid sm:grid-cols-2 gap-4">
 					<div className="space-y-2">
@@ -694,6 +762,131 @@ export default function ClinicReservationFormPage() {
 							))}
 						</div>
 					)}
+				</div>
+
+<div className="space-y-2">
+					<div className="flex items-center justify-between">
+						<Label>Services</Label>
+						<Button type="button" size="sm" variant="outline" className="gap-2" onClick={onAddService} disabled={!form.doctor_id}>
+							<Plus className="h-4 w-4" />
+							Add Service
+						</Button>
+					</div>
+					{doctorServicesQuery.isLoading && form.doctor_id && (
+						<p className="text-xs text-muted-foreground">Loading doctor services...</p>
+					)}
+					{Services.length === 0 && (
+						<p className="text-xs text-muted-foreground">No service rows yet.</p>
+					)}
+					{Services.map((sf, idx) => (
+						<div key={`${idx}-${sf.service_fee_id}`} className="grid grid-cols-12 gap-2 items-start border rounded-lg p-2">
+							<div className="col-span-12 md:col-span-5 space-y-1">
+								<Label className="text-xs">Service</Label>
+								<Select value={sf.service_fee_id} onValueChange={(v) => onPickService(idx, v)}>
+									<SelectTrigger><SelectValue placeholder="Select service" /></SelectTrigger>
+									<SelectContent>
+										{availableServices.map((item) => (
+											<SelectItem key={String(item.id)} value={String(item.id)}>
+												{item.service_name ?? `Service ${item.id}`}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="col-span-12 md:col-span-3 space-y-1">
+								<Label className="text-xs">Cost</Label>
+								<Input
+									type="number"
+									value={sf.fee}
+									onChange={(e) =>
+										setServices((prev) =>
+											prev.map((row, i) => (i === idx ? { ...row, fee: e.target.value } : row)),
+										)
+									}
+								/>
+							</div>
+							<div className="col-span-12 md:col-span-3 space-y-1">
+								<Label className="text-xs">Notes</Label>
+								<Textarea
+									rows={1}
+									value={sf.notes}
+									onChange={(e) =>
+										setServices((prev) =>
+											prev.map((row, i) => (i === idx ? { ...row, notes: e.target.value } : row)),
+										)
+									}
+								/>
+							</div>
+							<div className="col-span-12 md:col-span-1 pt-5">
+								<Button type="button" size="icon" variant="ghost" onClick={() => onRemoveService(idx)}>
+									<Trash2 className="h-4 w-4 text-destructive" />
+								</Button>
+							</div>
+						</div>
+					))}
+				</div>
+
+				<div className="space-y-2">
+					<div className="flex items-center justify-between">
+						<Label>Payment History</Label>
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							onClick={() => setPayments((prev) => [...prev, { date: form.date ? `${form.date}T00:00` : "", amount: "", payment_way: "cash" }])}
+						>
+							Add Payment
+						</Button>
+					</div>
+					{payments.length === 0 && <p className="text-xs text-muted-foreground">No payments added.</p>}
+					{payments.map((row, index) => (
+						<div key={`payment-${index}`} className="grid grid-cols-12 gap-2 items-end border rounded-lg p-2">
+							<div className="col-span-12 md:col-span-3 space-y-1">
+								<Label className="text-xs">Date</Label>
+								<Input
+									type="datetime-local"
+									value={row.date}
+									onChange={(e) => setPayments((prev) => prev.map((item, i) => (i === index ? { ...item, date: e.target.value } : item)))}
+								/>
+							</div>
+							<div className="col-span-12 md:col-span-3 space-y-1">
+								<Label className="text-xs">Amount</Label>
+								<Input
+									type="number"
+									min="0"
+									value={row.amount}
+									onChange={(e) => setPayments((prev) => prev.map((item, i) => (i === index ? { ...item, amount: e.target.value } : item)))}
+								/>
+							</div>
+							<div className="col-span-12 md:col-span-3 space-y-1">
+								<Label className="text-xs">Remaining</Label>
+								<Input
+									type="number"
+									value={String(paymentRowsWithRemaining[index]?.remaining ?? totalServicesCost)}
+									readOnly
+								/>
+							</div>
+							<div className="col-span-10 md:col-span-2 space-y-1">
+								<Label className="text-xs">Payment Way</Label>
+								<Select
+									value={row.payment_way}
+									onValueChange={(value: "cash") => setPayments((prev) => prev.map((item, i) => (i === index ? { ...item, payment_way: value } : item)))}
+								>
+									<SelectTrigger>
+										<SelectValue placeholder="Select payment way" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="cash">cash</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="col-span-2 md:col-span-1">
+								<Button type="button" size="icon" variant="ghost" onClick={() => setPayments((prev) => prev.filter((_, i) => i !== index))}>
+									<Trash2 className="h-4 w-4 text-destructive" />
+								</Button>
+							</div>
+						</div>
+					))}
 				</div>
 
 				<div className="flex justify-end gap-2">

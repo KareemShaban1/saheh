@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, ChevronLeft, ChevronRight, Edit, Glasses, Plus, Search, Smile, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsUpDown, Edit, Glasses, Plus, Search, Smile, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { clinicApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 
 type ReservationRow = {
   id: number | string;
+  parent_id?: number | null;
+  type?: "reservation" | "session" | string;
   patient_id?: number;
   doctor_id?: number;
   patient_name?: string;
@@ -25,16 +30,72 @@ type ReservationRow = {
   status?: string;
   acceptance?: string;
   payment?: string;
+  remaining?: number;
+  paid_amount?: number;
+  cost?: number | string | null;
   month?: string;
 };
 
+type SessionPaymentRow = {
+  date: string;
+  amount: string;
+  payment_way: "cash";
+};
+
+type SessionContextPayload = {
+  reservation?: {
+    id?: number | string;
+    patient_name?: string;
+    doctor_name?: string;
+    date?: string;
+    reservation_number?: string | null;
+    slot?: string | null;
+    cost?: number;
+    payment?: string;
+  };
+  previous_sessions?: Array<{
+    id: number | string;
+    date?: string;
+    reservation_number?: string | null;
+    slot?: string | null;
+    status?: string;
+    payment?: string;
+    remaining?: number;
+    paid_amount?: number;
+  }>;
+  payment_history?: Array<{
+    id: number | string;
+    module_id?: number | string;
+    module_type?: string;
+    date?: string;
+    amount?: number;
+    remaining?: number;
+    payment_way?: string | null;
+  }>;
+  remaining?: number;
+  paid_amount?: number;
+  payment?: string;
+  can_add_payment?: boolean;
+};
+
 type DrugRow = {
+  selected_drug_id?: string;
   name: string;
   type: string;
   dose: string;
   frequency: string;
   period: string;
   notes: string;
+};
+
+type ClinicDrugOption = {
+  id: number | string;
+  name?: string;
+  type?: string;
+  dose?: string;
+  frequency?: string;
+  period?: string;
+  notes?: string | null;
 };
 
 type ReservationRayRow = {
@@ -150,6 +211,19 @@ const dateKeyFromDate = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
+const toDateTimeLocal = (value?: string | null) => {
+  if (!value) return "";
+  if (value.includes(" ")) {
+    const [d, t] = value.split(" ");
+    return `${d}T${(t ?? "00:00:00").slice(0, 5)}`;
+  }
+  if (value.includes("T")) {
+    const [d, t] = value.split("T");
+    return `${d}T${(t ?? "00:00:00").slice(0, 5)}`;
+  }
+  return `${value}T00:00`;
+};
+
 const buildMonthGrid = (cursor: Date) => {
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
   const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
@@ -177,6 +251,7 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
   const [calendarCursor, setCalendarCursor] = useState(() => new Date());
   const [draggedReservationId, setDraggedReservationId] = useState<string | number | null>(null);
   const [prescriptionOpen, setPrescriptionOpen] = useState(false);
+  const [activeDrugPickerIndex, setActiveDrugPickerIndex] = useState<number | null>(null);
   const [prescriptionLoading, setPrescriptionLoading] = useState(false);
   const [raysOpen, setRaysOpen] = useState(false);
   const [raysLoading, setRaysLoading] = useState(false);
@@ -201,6 +276,17 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
   const [glassesHistory, setGlassesHistory] = useState<Array<{ id: number | string; created_at?: string | null } & GlassesDistanceForm>>([]);
   const [teethOpen, setTeethOpen] = useState(false);
   const [teethLoading, setTeethLoading] = useState(false);
+  const [sessionOpen, setSessionOpen] = useState(false);
+  const [sessionBaseReservation, setSessionBaseReservation] = useState<ReservationRow | null>(null);
+  const [sessionForm, setSessionForm] = useState<{
+    date: string;
+    reservation_value: string;
+    payments: SessionPaymentRow[];
+  }>({
+    date: "",
+    reservation_value: "",
+    payments: [],
+  });
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const [toothNotes, setToothNotes] = useState<Record<number, string>>({});
   const [teethGeneralNote, setTeethGeneralNote] = useState("");
@@ -215,18 +301,41 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
   }>({
     title: "",
     notes: "",
-    drugs: [{ name: "", type: "", dose: "", frequency: "", period: "", notes: "" }],
+    drugs: [{ selected_drug_id: undefined, name: "", type: "", dose: "", frequency: "", period: "", notes: "" }],
   });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["clinic", "reservations", todayOnly ? "today" : "all"],
     queryFn: () => clinicApi.reservations({ per_page: "500" }),
   });
+  const clinicDrugsQuery = useQuery({
+    queryKey: ["clinic", "drugs", "for-prescription"],
+    queryFn: () => clinicApi.drugs({ per_page: "500" }),
+  });
+
+  const sessionReservationOptionsQuery = useQuery({
+    queryKey: ["clinic", "session-reservation-options", sessionBaseReservation?.doctor_id, sessionForm.date],
+    queryFn: () =>
+      clinicApi.reservationOptions({
+        doctor_id: String(sessionBaseReservation?.doctor_id ?? ""),
+        date: sessionForm.date,
+      }),
+    enabled: Boolean(sessionOpen && sessionBaseReservation?.doctor_id && sessionForm.date),
+  });
+  const sessionContextQuery = useQuery({
+    queryKey: ["clinic", "reservation-session-context", sessionBaseReservation?.id],
+    queryFn: () => clinicApi.reservationSessionsContext(sessionBaseReservation!.id),
+    enabled: Boolean(sessionOpen && sessionBaseReservation?.id),
+  });
 
   const rows: ReservationRow[] = useMemo(() => {
     const root = (data as { data?: unknown })?.data ?? data;
     return (root as { data?: ReservationRow[] })?.data ?? [];
   }, [data]);
+  const clinicDrugOptions = useMemo<ClinicDrugOption[]>(() => {
+    const root = (clinicDrugsQuery.data as { data?: unknown })?.data ?? clinicDrugsQuery.data;
+    return (root as { data?: ClinicDrugOption[] })?.data ?? [];
+  }, [clinicDrugsQuery.data]);
   const todayKey = toDateKey(new Date().toISOString());
   const dateScopedRows = todayOnly ? rows.filter((r) => toDateKey(r.date) === todayKey) : rows;
   const filtered = dateScopedRows.filter((r) =>
@@ -251,12 +360,46 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
     () => calendarCursor.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
     [calendarCursor],
   );
+  const sessionReservationOptions = useMemo(() => {
+    const root = (sessionReservationOptionsQuery.data as { data?: unknown })?.data ?? sessionReservationOptionsQuery.data;
+    const options = (root ?? {}) as {
+      mode?: "numbers" | "slots";
+      all_values?: string[];
+      reserved_values?: string[];
+      available_values?: string[];
+    };
+    return {
+      mode: options.mode ?? "numbers",
+      allValues: options.all_values ?? [],
+      reservedValues: options.reserved_values ?? [],
+      values: options.available_values ?? [],
+    };
+  }, [sessionReservationOptionsQuery.data]);
+  const sessionContext = useMemo(() => {
+    const root = (sessionContextQuery.data as { data?: unknown })?.data ?? sessionContextQuery.data;
+    return ((root ?? {}) as SessionContextPayload);
+  }, [sessionContextQuery.data]);
+  const sessionBaseRemaining = Number(sessionContext.remaining ?? sessionBaseReservation?.remaining ?? 0);
+  const sessionCanAddPayments = Boolean(sessionContext.can_add_payment ?? (sessionBaseRemaining > 0));
+  const sessionPreviousRows = sessionContext.previous_sessions ?? [];
+  const sessionHistoryRows = sessionContext.payment_history ?? [];
+  const sessionPaymentsWithRemaining = useMemo(() => {
+    let runningPaid = 0;
+    return sessionForm.payments.map((row) => {
+      runningPaid += Number(row.amount || 0);
+      return {
+        ...row,
+        remaining: sessionBaseRemaining - runningPaid,
+      };
+    });
+  }, [sessionForm.payments, sessionBaseRemaining]);
 
   const savePrescriptionMutation = useMutation({
     mutationFn: async () => {
       if (!activeReservation) return;
       const normalizedDrugs = prescriptionForm.drugs
         .map((d) => ({
+          selected_drug_id: d.selected_drug_id ? String(d.selected_drug_id) : undefined,
           name: d.name.trim(),
           type: d.type.trim(),
           dose: d.dose.trim(),
@@ -312,7 +455,7 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
         slot: reservation.slot ?? reservation.time ?? undefined,
         status: (reservation.status as "waiting" | "entered" | "finished" | "cancelled" | undefined) ?? "waiting",
         acceptance: (reservation.acceptance as "pending" | "approved" | "not_approved" | undefined) ?? "pending",
-        payment: (reservation.payment as "paid" | "not_paid" | "unpaid" | undefined) ?? "not_paid",
+        payment: (reservation.payment as "paid" | "not_paid" | "partially_paid" | "unpaid" | undefined) ?? "not_paid",
         month: targetDate.slice(5, 7),
       });
     },
@@ -324,6 +467,42 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
       toast({
         title: "Failed to move reservation",
         description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createSessionMutation = useMutation({
+    mutationFn: async () => {
+      if (!sessionBaseReservation) throw new Error("Parent reservation not selected.");
+      if (!sessionForm.date) throw new Error("Session date is required.");
+      if (!sessionForm.reservation_value) throw new Error("Reservation number or slot is required.");
+
+      return clinicApi.createReservationSession(sessionBaseReservation.id, {
+        date: sessionForm.date,
+        reservation_number: sessionReservationOptions.mode === "numbers" ? sessionForm.reservation_value : undefined,
+        slot: sessionReservationOptions.mode === "slots" ? sessionForm.reservation_value : undefined,
+        payments: sessionForm.payments
+          .filter((row) => row.date && row.amount !== "")
+          .map((row, index) => ({
+            date: row.date,
+            amount: Number(row.amount || 0),
+            remaining: Math.max(0, Number(sessionPaymentsWithRemaining[index]?.remaining ?? sessionBaseRemaining)),
+            payment_way: row.payment_way,
+          })),
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["clinic", "reservations"] });
+      toast({ title: "Session created" });
+      setSessionOpen(false);
+      setSessionBaseReservation(null);
+      setSessionForm({ date: "", reservation_value: "", payments: [] });
+    },
+    onError: (e) => {
+      toast({
+        title: "Failed to create session",
+        description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
     },
@@ -382,6 +561,7 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
         title?: string | null;
         notes?: string | null;
         drugs?: Array<{
+          drug_id?: number | string | null;
           name?: string;
           type?: string;
           dose?: string;
@@ -393,6 +573,7 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
       };
       const drugs = Array.isArray(dataObj.drugs) && dataObj.drugs.length > 0
         ? dataObj.drugs.map((d) => ({
+            selected_drug_id: d.drug_id != null && d.drug_id !== "" ? String(d.drug_id) : undefined,
             name: String(d.name ?? ""),
             type: String(d.type ?? ""),
             dose: String(d.dose ?? ""),
@@ -400,7 +581,7 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
             period: String(d.period ?? ""),
             notes: String(d.notes ?? ""),
           }))
-        : [{ name: "", type: "", dose: "", frequency: "", period: "", notes: "" }];
+        : [{ selected_drug_id: undefined, name: "", type: "", dose: "", frequency: "", period: "", notes: "" }];
 
       setPrescriptionForm({
         title: String(dataObj.title ?? ""),
@@ -561,6 +742,31 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
     }
   };
 
+  const openSessionModal = (reservation: ReservationRow) => {
+    setSessionBaseReservation(reservation);
+    setSessionForm({
+      date: toDateKey(reservation.date) ?? new Date().toISOString().slice(0, 10),
+      reservation_value: "",
+      payments: Number(reservation.remaining ?? 0) > 0
+        ? [{ date: toDateTimeLocal(reservation.date), amount: "", payment_way: "cash" }]
+        : [],
+    });
+    setSessionOpen(true);
+  };
+
+  useEffect(() => {
+    if (!sessionOpen) return;
+    if (!sessionCanAddPayments) {
+      setSessionForm((prev) => ({ ...prev, payments: [] }));
+      return;
+    }
+    if (sessionForm.payments.length > 0) return;
+    setSessionForm((prev) => ({
+      ...prev,
+      payments: [{ date: `${prev.date}T00:00`, amount: "", payment_way: "cash" }],
+    }));
+  }, [sessionOpen, sessionCanAddPayments, sessionForm.payments.length]);
+
   useEffect(() => {
     return () => {
       newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
@@ -570,7 +776,7 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
   const addDrugRow = () => {
     setPrescriptionForm((prev) => ({
       ...prev,
-      drugs: [...prev.drugs, { name: "", type: "", dose: "", frequency: "", period: "", notes: "" }],
+      drugs: [...prev.drugs, { selected_drug_id: undefined, name: "", type: "", dose: "", frequency: "", period: "", notes: "" }],
     }));
   };
 
@@ -578,6 +784,28 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
     setPrescriptionForm((prev) => ({
       ...prev,
       drugs: prev.drugs.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const applyClinicDrugToRow = (rowIndex: number, drugId: string) => {
+    const selected = clinicDrugOptions.find((item) => String(item.id) === drugId);
+    if (!selected) return;
+    setPrescriptionForm((prev) => ({
+      ...prev,
+      drugs: prev.drugs.map((drug, idx) =>
+        idx === rowIndex
+          ? {
+              ...drug,
+              selected_drug_id: String(selected.id),
+              name: String(selected.name ?? ""),
+              type: String(selected.type ?? ""),
+              dose: String(selected.dose ?? ""),
+              frequency: String(selected.frequency ?? ""),
+              period: String(selected.period ?? ""),
+              notes: String(selected.notes ?? ""),
+            }
+          : drug,
+      ),
     }));
   };
 
@@ -736,7 +964,12 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
               {paged.map((r) => (
                 <tr key={String(r.id)} className="hover:bg-muted/30 transition-colors">
                   <td className="p-4 text-muted-foreground">{String(r.id)}</td>
-                  <td className="p-4 font-medium">{r.patient_name ?? "—"}</td>
+                  <td className="p-4 font-medium">
+                    {r.patient_name ?? "—"}
+                    {(r.type ?? "reservation") === "session" ? (
+                      <Badge variant="secondary" className="ml-2">session</Badge>
+                    ) : null}
+                  </td>
                   <td className="p-4 text-muted-foreground">{r.doctor_name ?? "—"}</td>
                   <td className="p-4 text-muted-foreground">{r.date ?? "—"}</td>
                   <td className="p-4 text-muted-foreground">{r.reservation_number ?? r.slot ?? r.time ?? "—"}</td>
@@ -749,6 +982,11 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
                   <td className="p-4 text-muted-foreground">{r.payment === "not_paid" ? "unpaid" : r.payment ?? "—"}</td>
                   <td className="p-4">
                     <div className="flex flex-wrap gap-2">
+                      {(r.type ?? "reservation") === "reservation" ? (
+                        <Button variant="outline" size="sm" onClick={() => openSessionModal(r)}>
+                         {t("clinic.reservations.AddSession")}
+                        </Button>
+                      ) : null}
                       <Button asChild variant="outline" size="sm" className="gap-2">
                         <Link to={`/clinic-dashboard/reservations/${r.id}/edit`}>
                           <Edit className="h-4 w-4" />
@@ -759,7 +997,7 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
                         {t("clinic.reservations.Prescription")}
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => void openRaysModal(r)}>
-                        Rays
+                        {t("clinic.reservations.Rays")}
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => void openGlassesModal(r)} className="gap-2">
                         <Glasses className="h-4 w-4" />
@@ -797,6 +1035,206 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
       </div>
       )}
 
+      <Dialog open={sessionOpen} onOpenChange={setSessionOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {t("clinic.reservations.AddSession")} {sessionBaseReservation ? `for Reservation #${sessionBaseReservation.id}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {sessionContextQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">{t("clinic.reservations.LoadingReservationSessionContext")}</p>
+            ) : null}
+            <div className="rounded-md border p-3 text-sm">
+              <p><span className="font-medium">{t("clinic.reservations.Patient")}:</span> {sessionContext.reservation?.patient_name ?? sessionBaseReservation?.patient_name ?? "—"}</p>
+              <p><span className="font-medium">{t("clinic.reservations.Doctor")}:</span> {sessionContext.reservation?.doctor_name ?? sessionBaseReservation?.doctor_name ?? "—"}</p>
+              <p><span className="font-medium">{t("clinic.reservations.ReservationCost")}:</span> {sessionContext.reservation?.cost ?? sessionBaseReservation?.cost ?? 0}</p>
+              <p><span className="font-medium">{t("clinic.reservations.Remaining")}:</span> {sessionBaseRemaining}</p>
+            </div>
+            {sessionPreviousRows.length > 0 ? (
+              <div className="space-y-2">
+                <Label>{t("clinic.reservations.PreviousSessions")}</Label>
+                <div className="max-h-36 overflow-y-auto rounded-md border">
+                  {sessionPreviousRows.map((session) => (
+                    <div key={String(session.id)} className="flex items-center justify-between gap-2 border-b px-3 py-2 text-xs last:border-b-0">
+                      <div>
+                        <p className="font-medium">#{session.id} - {session.date ?? "—"}</p>
+                        <p className="text-muted-foreground">{session.reservation_number ?? session.slot ?? "—"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p>{session.payment ?? "—"}</p>
+                        <p className="text-muted-foreground">Remaining: {session.remaining ?? 0}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {sessionHistoryRows.length > 0 ? (
+              <div className="space-y-2">
+                <Label>{t("clinic.reservations.PaymentHistory")}</Label>
+                <div className="max-h-36 overflow-y-auto rounded-md border">
+                  {sessionHistoryRows.map((row) => (
+                    <div key={String(row.id)} className="flex items-center justify-between gap-2 border-b px-3 py-2 text-xs last:border-b-0">
+                      <div>
+                        <p className="font-medium">{row.date ?? "—"}</p>
+                        <p className="text-muted-foreground">{row.module_type ?? "Reservation"} #{row.module_id ?? "—"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p>{t("clinic.reservations.Amount")}: {row.amount ?? 0}</p>
+                        <p className="text-muted-foreground">{t("clinic.reservations.Remaining")}: {row.remaining ?? 0}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>{t("clinic.reservations.Date")}</Label>
+                <Input
+                  type="date"
+                  value={sessionForm.date}
+                  onChange={(e) => setSessionForm((prev) => ({ ...prev, date: e.target.value, reservation_value: "" }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>{sessionReservationOptions.mode === "slots" ? t("clinic.reservations.Slot") : t("clinic.reservations.ReservationNumber")}</Label>
+                {(sessionReservationOptions.allValues.length > 0 ? sessionReservationOptions.allValues : sessionReservationOptions.values).length > 0 ? (
+                  <select
+                    title={t("clinic.reservations.SessionReservationValue")}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={sessionForm.reservation_value}
+                    onChange={(e) => setSessionForm((prev) => ({ ...prev, reservation_value: e.target.value }))}
+                  >
+                    <option value="">{t("clinic.reservations.Select")}...</option>
+                    {(sessionReservationOptions.allValues.length > 0 ? sessionReservationOptions.allValues : sessionReservationOptions.values).map((value) => (
+                      <option key={value} value={value} disabled={sessionReservationOptions.reservedValues.includes(value)}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={sessionForm.reservation_value}
+                    onChange={(e) => setSessionForm((prev) => ({ ...prev, reservation_value: e.target.value }))}
+                    placeholder={sessionReservationOptionsQuery.isLoading ? "Loading options..." : "Enter value"}
+                  />
+                )}
+              </div>
+            </div>
+
+            {sessionCanAddPayments ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>{t("clinic.reservations.Payments")}</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setSessionForm((prev) => ({
+                        ...prev,
+                        payments: [...prev.payments, { date: `${sessionForm.date}T00:00`, amount: "", payment_way: "cash" }],
+                      }))
+                    }
+                  >
+                    {t("clinic.reservations.AddPayment")}
+                  </Button>
+                </div>
+                {sessionForm.payments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("clinic.reservations.NoPaymentRowsYet")}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {sessionForm.payments.map((row, index) => (
+                      <div key={index} className="rounded-md border p-2 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+                        <div className="space-y-1">
+                          <Label>{t("clinic.reservations.Date")}</Label>
+                          <Input
+                            type="datetime-local"
+                            value={row.date}
+                            onChange={(e) =>
+                              setSessionForm((prev) => ({
+                                ...prev,
+                                payments: prev.payments.map((item, i) => (i === index ? { ...item, date: e.target.value } : item)),
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>{t("clinic.reservations.Amount")}</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={row.amount}
+                            onChange={(e) =>
+                              setSessionForm((prev) => ({
+                                ...prev,
+                                payments: prev.payments.map((item, i) => (i === index ? { ...item, amount: e.target.value } : item)),
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>{t("clinic.reservations.PaymentWay")}</Label>
+                          <select
+                            title="Session payment way"
+                            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                            value={row.payment_way}
+                            onChange={(e) =>
+                              setSessionForm((prev) => ({
+                                ...prev,
+                                payments: prev.payments.map((item, i) => (i === index ? { ...item, payment_way: e.target.value as "cash" } : item)),
+                              }))
+                            }
+                          >
+                            <option value="cash">{t("clinic.reservations.Cash")}</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>{t("clinic.reservations.Remaining")}</Label>
+                          <div className="h-10 rounded-md border px-3 py-2 text-sm text-muted-foreground flex items-center justify-between">
+                            <span>{sessionPaymentsWithRemaining[index]?.remaining ?? sessionBaseRemaining}</span>
+                            <button
+                              type="button"
+                              className="text-destructive text-xs underline"
+                              onClick={() =>
+                                setSessionForm((prev) => ({
+                                  ...prev,
+                                  payments: prev.payments.filter((_, i) => i !== index),
+                                }))
+                              }
+                            >
+                              {t("clinic.reservations.Remove")}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("clinic.reservations.ReservationIsAlreadyFullyPaidNoNewPaymentRequired")}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSessionOpen(false)} disabled={createSessionMutation.isPending}>
+              {t("clinic.reservations.Cancel")}
+            </Button>
+            <Button
+              onClick={() => createSessionMutation.mutate()}
+              disabled={createSessionMutation.isPending}
+              className="gradient-primary text-primary-foreground border-0"
+            >
+              {createSessionMutation.isPending ? t("clinic.reservations.Saving") : t("clinic.reservations.CreateSession")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={prescriptionOpen} onOpenChange={setPrescriptionOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
@@ -805,12 +1243,12 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
             </DialogTitle>
           </DialogHeader>
           {prescriptionLoading ? (
-            <p className="text-sm text-muted-foreground">Loading prescription...</p>
+            <p className="text-sm text-muted-foreground">{t("clinic.reservations.LoadingPrescription")}</p>
           ) : (
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="rx-title">{t("clinic.reservations.Title")}</Label>
+                  <Label htmlFor="rx-title">{t("clinic.reservations.PrescriptionTitle")}</Label>
                   <Input
                     id="rx-title"
                     value={prescriptionForm.title}
@@ -856,58 +1294,109 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
                 </div>
                 {prescriptionForm.drugs.map((drug, idx) => (
                   <div key={idx} className="border rounded-lg p-3 space-y-2">
-                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
-                      <Input
-                        placeholder={t("clinic.reservations.Name")}
-                        value={drug.name}
-                        onChange={(e) =>
-                          setPrescriptionForm((prev) => ({
-                            ...prev,
-                            drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, name: e.target.value } : d)),
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder={t("clinic.reservations.Type")}
-                        value={drug.type}
-                        onChange={(e) =>
-                          setPrescriptionForm((prev) => ({
-                            ...prev,
-                            drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, type: e.target.value } : d)),
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder={t("clinic.reservations.Dose")}
-                        value={drug.dose}
-                        onChange={(e) =>
-                          setPrescriptionForm((prev) => ({
-                            ...prev,
-                            drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, dose: e.target.value } : d)),
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder={t("clinic.reservations.Frequency")}
-                        value={drug.frequency}
-                        onChange={(e) =>
-                          setPrescriptionForm((prev) => ({
-                            ...prev,
-                            drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, frequency: e.target.value } : d)),
-                          }))
-                        }
-                      />
-                      <Input
-                        placeholder={t("clinic.reservations.Period")}
-                        value={drug.period}
-                        onChange={(e) =>
-                          setPrescriptionForm((prev) => ({
-                            ...prev,
-                            drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, period: e.target.value } : d)),
-                          }))
-                        }
-                      />
-                      <div className="flex items-center justify-end">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-7 gap-2 items-end">
+                      <div className="space-y-2 col-span-2">
+                        <Label>{t("clinic.reservations.Drugs")}</Label>
+                        <Popover open={activeDrugPickerIndex === idx} onOpenChange={(open) => setActiveDrugPickerIndex(open ? idx : null)}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" className="w-full justify-between">
+                              {drug.selected_drug_id
+                                ? (clinicDrugOptions.find((item) => String(item.id) === String(drug.selected_drug_id))?.name ?? `Drug #${drug.selected_drug_id}`)
+                                : (clinicDrugsQuery.isLoading ? "Loading clinic drugs..." : "Select clinic drug")}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[420px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search clinic drugs..." />
+                              <CommandEmpty>No drug found.</CommandEmpty>
+                              <CommandGroup className="max-h-64 overflow-y-auto">
+                                {clinicDrugOptions.map((item) => (
+                                  <CommandItem
+                                    key={String(item.id)}
+                                    value={`${item.name ?? ""} ${item.type ?? ""} ${item.dose ?? ""} ${item.frequency ?? ""} ${item.period ?? ""} ${String(item.id)}`}
+                                    onSelect={() => {
+                                      applyClinicDrugToRow(idx, String(item.id));
+                                      setActiveDrugPickerIndex(null);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        String(drug.selected_drug_id ?? "") === String(item.id) ? "opacity-100" : "opacity-0",
+                                      )}
+                                    />
+                                    <span className="truncate">{item.name ?? `Drug ${item.id}`} - {item.type ?? "—"}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>{t("clinic.reservations.Name")}</Label>
+                        <Input
+                          value={drug.name}
+	                disabled={drug.selected_drug_id !== undefined}
+                          onChange={(e) =>
+                            setPrescriptionForm((prev) => ({
+                              ...prev,
+                              drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, selected_drug_id: undefined, name: e.target.value } : d)),
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>{t("clinic.reservations.Type")}</Label>
+                        <Input
+                          value={drug.type}
+                          onChange={(e) =>
+                            setPrescriptionForm((prev) => ({
+                              ...prev,
+                              drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, type: e.target.value } : d)),
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>{t("clinic.reservations.Dose")}</Label>
+                        <Input
+                          value={drug.dose}
+                          onChange={(e) =>
+                            setPrescriptionForm((prev) => ({
+                              ...prev,
+                              drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, dose: e.target.value } : d)),
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>{t("clinic.reservations.Frequency")}</Label>
+                        <Input
+                          value={drug.frequency}
+                          onChange={(e) =>
+                            setPrescriptionForm((prev) => ({
+                              ...prev,
+                              drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, frequency: e.target.value } : d)),
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="flex items-end justify-end h-full">
+	<div className="space-y-1">
+                        <Label>{t("clinic.reservations.Period")}</Label>
+                        <Input
+                          value={drug.period}
+                          onChange={(e) =>
+                            setPrescriptionForm((prev) => ({
+                              ...prev,
+                              drugs: prev.drugs.map((d, i) => (i === idx ? { ...d, period: e.target.value } : d)),
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="w-[20px] flex items-end justify-end h-full">
                         <Button
                           type="button"
                           variant="ghost"
@@ -918,6 +1407,7 @@ export default function ClinicReservations({ todayOnly = false }: ClinicReservat
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
+	</div>
                     </div>
                     <Textarea
                       rows={2}

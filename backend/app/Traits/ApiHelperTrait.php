@@ -90,4 +90,14 @@ trait ApiHelperTrait
             ], $code);
         }
     }
+
+   public function pagination($paginated): array
+    {
+        return [
+            'current_page' => $paginated->currentPage(),
+            'last_page' => $paginated->lastPage(),
+            'per_page' => $paginated->perPage(),
+            'total' => $paginated->total(),
+        ];
+    }
 }

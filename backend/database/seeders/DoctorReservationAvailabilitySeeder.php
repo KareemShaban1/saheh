@@ -270,6 +270,8 @@ class DoctorReservationAvailabilitySeeder extends Seeder
                     'date' => $payload['date'],
                     'reservation_number' => $payload['reservation_number'] ?? null,
                     'slot' => $payload['slot'] ?? null,
+		'type' => 'reservation',
+		'payment' => 'not_paid',
                 ],
                 $payload
             );

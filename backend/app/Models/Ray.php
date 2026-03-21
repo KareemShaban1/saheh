@@ -88,6 +88,11 @@ class Ray extends Model implements HasMedia
         return $this->morphMany(ModuleService::class, 'module')->with('service');
     }
 
+    public function payments()
+    {
+        return $this->morphMany(Payment::class, 'payable')->orderByDesc('payment_date')->orderByDesc('id');
+    }
+
     public function scopePaid($query)
     {
         return $query->where('payment', 'paid');

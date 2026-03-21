@@ -7,6 +7,32 @@ interface RequestOptions {
 	token?: string;
 }
 
+export type QuestionnaireQuestionType =
+	| "short_text"
+	| "long_text"
+	| "number"
+	| "boolean"
+	| "date"
+	| "single_choice"
+	| "multiple_choice";
+
+export type QuestionnaireQuestionInput = {
+	question_text: string;
+	question_type: QuestionnaireQuestionType;
+	is_required?: boolean;
+	sort_order?: number;
+	placeholder?: string | null;
+	options?: string[];
+	meta?: Record<string, unknown>;
+};
+
+export type QuestionnaireInput = {
+	title: string;
+	description?: string;
+	is_active?: boolean;
+	questions: QuestionnaireQuestionInput[];
+};
+
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
 	const { method = "GET", body, headers = {}, token } = options;
 	const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
@@ -72,6 +98,38 @@ export const publicApi = {
 		const q = params ? "?" + new URLSearchParams(params).toString() : "";
 		return request(`/patient/clinics${q}`);
 	},
+	// Dedicated unauthenticated landing page APIs
+	landingOverview: () => request("/public/landing/overview"),
+	landingFeaturedClinics: (params?: Record<string, string>) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/public/landing/clinics${q}`);
+	},
+	landingMedicalLabs: (params?: Record<string, string>) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/public/landing/labs${q}`);
+	},
+	landingRadiologyCenters: (params?: Record<string, string>) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/public/landing/radiology-centers${q}`);
+	},
+	organizationMedia: (params: {
+		owner_type: "clinic" | "doctor" | "lab" | "radiology_center";
+		owner_id: string | number;
+		media_type?: "reel" | "video" | "story";
+		limit?: string | number;
+	}) => {
+		const q = new URLSearchParams({
+			owner_type: String(params.owner_type),
+			owner_id: String(params.owner_id),
+			...(params.media_type ? { media_type: String(params.media_type) } : {}),
+			...(params.limit ? { limit: String(params.limit) } : {}),
+		}).toString();
+		return request(`/public/media?${q}`);
+	},
+	reels: (params?: { limit?: string | number }) => {
+		const q = params ? "?" + new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))).toString() : "";
+		return request(`/public/reels${q}`);
+	},
 	clinic: (id: string) => request(`/patient/clinic/${id}`),
 	doctor: (id: string) => request(`/patient/doctor/${id}`),
 	medicalLabs: () => request("/patient/medical_laboratories"),
@@ -136,6 +194,40 @@ export const patientApi = {
 		chatId: string | number,
 		data: { message?: string } | FormData,
 	) => request(`/patient/chat/conversations/${chatId}/messages`, { method: "POST", body: data, token }),
+	questionnaires: (
+		token: string,
+		params: { organization_type: string; organization_id: string | number },
+	) => {
+		const q = new URLSearchParams({
+			organization_type: String(params.organization_type),
+			organization_id: String(params.organization_id),
+		}).toString();
+		return request(`/patient/questionnaires?${q}`, { token });
+	},
+	questionnaireAnswers: (token: string, questionnaireId: string | number) =>
+		request(`/patient/questionnaires/${questionnaireId}/answers`, { token }),
+	submitQuestionnaireAnswers: (
+		token: string,
+		questionnaireId: string | number,
+		data: {
+			answers: Array<{
+				question_id: number;
+				answer_text?: string;
+				answer_number?: number;
+				answer_boolean?: boolean;
+				answer_date?: string;
+				answer_json?: string[];
+			}>;
+		},
+	) => request(`/patient/questionnaires/${questionnaireId}/answers`, { method: "POST", body: data, token }),
+	reels: (token: string, params?: { limit?: string | number }) => {
+		const q = params ? "?" + new URLSearchParams(Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))).toString() : "";
+		return request(`/patient/reels${q}`, { token });
+	},
+	toggleReelLike: (token: string, reelId: string | number) =>
+		request(`/patient/reels/${reelId}/toggle-like`, { method: "POST", token }),
+	toggleReelSave: (token: string, reelId: string | number) =>
+		request(`/patient/reels/${reelId}/toggle-save`, { method: "POST", token }),
 };
 
 // Admin dashboard (session-based)
@@ -470,6 +562,26 @@ export const organizationChatApi = {
 	) => request(`/organization/chat/conversations/${chatId}/messages`, { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
 };
 
+export const organizationMediaApi = {
+	list: (params?: { target_type?: "organization" | "doctor"; target_id?: string | number; media_type?: "reel" | "video" | "story" }, token?: string | null) => {
+		const q = params
+			? "?" +
+			  new URLSearchParams(
+					Object.fromEntries(
+						Object.entries(params)
+							.filter(([, value]) => value !== undefined && value !== null && value !== "")
+							.map(([key, value]) => [key, String(value)]),
+					),
+			  ).toString()
+			: "";
+		return request(`/organization/media${q}`, { token: token ?? getOrganizationToken() ?? undefined });
+	},
+	upload: (data: FormData, token?: string | null) =>
+		request("/organization/media", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	remove: (id: string | number, token?: string | null) =>
+		request(`/organization/media/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
+};
+
 // Clinic dashboard (Bearer token from localStorage)
 export const clinicApi = {
 	dashboard: (token?: string | null) =>
@@ -484,6 +596,8 @@ export const clinicApi = {
 	},
 	reservation: (id: string | number, token?: string | null) =>
 		request(`/clinic/reservations/${id}`, { token: token ?? getOrganizationToken() ?? undefined }),
+	reservationSessionsContext: (id: string | number, token?: string | null) =>
+		request(`/clinic/reservations/${id}/sessions-context`, { token: token ?? getOrganizationToken() ?? undefined }),
 	createReservation: (
 		data:
 			| {
@@ -495,11 +609,12 @@ export const clinicApi = {
 					slot?: string | null;
 					status?: "waiting" | "entered" | "finished" | "cancelled";
 					acceptance: "pending" | "approved" | "not_approved";
-					payment: "paid" | "not_paid" | "unpaid";
+					payment?: "paid" | "not_paid" | "partially_paid";
 					month?: string;
 					first_diagnosis?: string | null;
 					final_diagnosis?: string | null;
 					services?: Array<{ service_fee_id: number; fee?: number; notes?: string }>;
+					payments?: Array<{ date: string; amount: number; remaining: number; payment_way?: string }>;
 			  }
 			| FormData,
 		token?: string | null,
@@ -516,16 +631,40 @@ export const clinicApi = {
 					slot?: string | null;
 					status?: "waiting" | "entered" | "finished" | "cancelled";
 					acceptance: "pending" | "approved" | "not_approved";
-					payment: "paid" | "not_paid" | "unpaid";
+					payment?: "paid" | "not_paid" | "partially_paid";
 					month?: string;
 					first_diagnosis?: string | null;
 					final_diagnosis?: string | null;
 					remove_voice_record_ids?: number[];
 					services?: Array<{ service_fee_id: number; fee?: number; notes?: string }>;
+					payments?: Array<{ date: string; amount: number; remaining: number; payment_way?: string }>;
 			  }
 			| FormData,
 		token?: string | null,
-	) => request(`/clinic/reservations/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	) => {
+		if (typeof FormData !== "undefined" && data instanceof FormData) {
+			data.set("_method", "PUT");
+			return request(`/clinic/reservations/${id}`, { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined });
+		}
+		return request(`/clinic/reservations/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined });
+	},
+	createReservationSession: (
+		id: string | number,
+		data:
+			| {
+					date: string;
+					reservation_number?: string | null;
+					slot?: string | null;
+					status?: "waiting" | "entered" | "finished" | "cancelled";
+					acceptance?: "pending" | "approved" | "not_approved";
+					month?: string;
+					first_diagnosis?: string | null;
+					final_diagnosis?: string | null;
+					payments?: Array<{ date: string; amount: number; remaining: number; payment_way?: string }>;
+			  }
+			| FormData,
+		token?: string | null,
+	) => request(`/clinic/reservations/${id}/sessions`, { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
 	reservationPrescription: (id: string | number, token?: string | null) =>
 		request(`/clinic/reservations/${id}/prescription`, { token: token ?? getOrganizationToken() ?? undefined }),
 	saveReservationPrescription: (
@@ -535,6 +674,7 @@ export const clinicApi = {
 					title?: string;
 					notes?: string;
 					drugs: Array<{
+						selected_drug_id?: string;
 						name: string;
 						type: string;
 						dose: string;
@@ -584,9 +724,8 @@ export const clinicApi = {
 		data:
 			| {
 					date: string;
-					payment: "paid" | "not_paid";
 					report?: string;
-					cost?: number | null;
+					payments?: Array<{ date: string; amount: number; remaining: number; payment_way?: string }>;
 			  }
 			| FormData,
 		token?: string | null,
@@ -621,7 +760,7 @@ export const clinicApi = {
 	specialties: (token?: string | null) =>
 		request("/clinic/specialties", { token: token ?? getOrganizationToken() ?? undefined }),
 	doctorServices: (doctorId: string | number, token?: string | null) =>
-		request(`/clinic/doctors/${doctorId}/service-fees`, { token: token ?? getOrganizationToken() ?? undefined }),
+		request(`/clinic/doctors/${doctorId}/services`, { token: token ?? getOrganizationToken() ?? undefined }),
 	patients: (params?: Record<string, string>, token?: string | null) => {
 		const q = params ? "?" + new URLSearchParams(params).toString() : "";
 		return request(`/clinic/patients${q}`, { token: token ?? getOrganizationToken() ?? undefined });
@@ -785,6 +924,11 @@ export const clinicApi = {
 			price: number;
 			type: "main" | "sub";
 			notes?: string | null;
+			service_instructions?: {
+				instructions: string;
+				type?: "pre" | "post";
+				notes?: string | null;
+			}[];
 		},
 		token?: string | null,
 	) => request("/clinic/services", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
@@ -796,9 +940,61 @@ export const clinicApi = {
 			price: number;
 			type: "main" | "sub";
 			notes?: string | null;
+			service_instructions?: {
+				instruction: string;
+				type?: "pre" | "post";
+				notes?: string | null;
+			}[];
 		},
 		token?: string | null,
 	) => request(`/clinic/services/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	drugs: (params?: Record<string, string>, token?: string | null) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/clinic/drugs${q}`, { token: token ?? getOrganizationToken() ?? undefined });
+	},
+	drug: (id: string | number, token?: string | null) =>
+		request(`/clinic/drugs/${id}`, { token: token ?? getOrganizationToken() ?? undefined }),
+	createDrug: (
+		data: {
+			doctor_id: number;
+			name: string;
+			type: string;
+			dose: string;
+			frequency: string;
+			period: string;
+			notes?: string | null;
+		},
+		token?: string | null,
+	) => request("/clinic/drugs", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	updateDrug: (
+		id: string | number,
+		data: {
+			doctor_id: number;
+			name: string;
+			type: string;
+			dose: string;
+			frequency: string;
+			period: string;
+			notes?: string | null;
+		},
+		token?: string | null,
+	) => request(`/clinic/drugs/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	deleteDrug: (id: string | number, token?: string | null) =>
+		request(`/clinic/drugs/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
+	questionnaires: (params?: Record<string, string>, token?: string | null) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/clinic/questionnaires${q}`, { token: token ?? getOrganizationToken() ?? undefined });
+	},
+	questionnaire: (id: string | number, token?: string | null) =>
+		request(`/clinic/questionnaires/${id}`, { token: token ?? getOrganizationToken() ?? undefined }),
+	createQuestionnaire: (data: QuestionnaireInput, token?: string | null) =>
+		request("/clinic/questionnaires", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	updateQuestionnaire: (id: string | number, data: QuestionnaireInput, token?: string | null) =>
+		request(`/clinic/questionnaires/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	deleteQuestionnaire: (id: string | number, token?: string | null) =>
+		request(`/clinic/questionnaires/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
+	questionnaireAnswers: (id: string | number, token?: string | null) =>
+		request(`/clinic/questionnaires/${id}/answers`, { token: token ?? getOrganizationToken() ?? undefined }),
 	settings: (token?: string | null) =>
 		request("/clinic/settings", { token: token ?? getOrganizationToken() ?? undefined }),
 	updateSettings: (
@@ -883,9 +1079,8 @@ export const radiologyApi = {
 					patient_id: number;
 					reservation_id?: number | null;
 					date: string;
-					payment: "paid" | "not_paid";
-					cost?: number | null;
 					report?: string | null;
+					payments?: Array<{ date: string; amount: number; remaining: number; payment_way?: string }>;
 			  }
 			| FormData,
 		token?: string | null,
@@ -897,13 +1092,18 @@ export const radiologyApi = {
 					patient_id: number;
 					reservation_id?: number | null;
 					date: string;
-					payment: "paid" | "not_paid";
-					cost?: number | null;
 					report?: string | null;
+					payments?: Array<{ date: string; amount: number; remaining: number; payment_way?: string }>;
 			  }
 			| FormData,
 		token?: string | null,
-	) => request(`/radiologyCenter/rays/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	) => {
+		if (typeof FormData !== "undefined" && data instanceof FormData) {
+			data.set("_method", "PUT");
+			return request(`/radiologyCenter/rays/${id}`, { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined });
+		}
+		return request(`/radiologyCenter/rays/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined });
+	},
 	deleteRay: (id: string | number, token?: string | null) =>
 		request(`/radiologyCenter/rays/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
 	users: (params?: Record<string, string>, token?: string | null) => {
@@ -1007,6 +1207,20 @@ export const radiologyApi = {
 		request(`/radiologyCenter/roles/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
 	permissions: (token?: string | null) =>
 		request("/radiologyCenter/permissions", { token: token ?? getOrganizationToken() ?? undefined }),
+	questionnaires: (params?: Record<string, string>, token?: string | null) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/radiologyCenter/questionnaires${q}`, { token: token ?? getOrganizationToken() ?? undefined });
+	},
+	questionnaire: (id: string | number, token?: string | null) =>
+		request(`/radiologyCenter/questionnaires/${id}`, { token: token ?? getOrganizationToken() ?? undefined }),
+	createQuestionnaire: (data: QuestionnaireInput, token?: string | null) =>
+		request("/radiologyCenter/questionnaires", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	updateQuestionnaire: (id: string | number, data: QuestionnaireInput, token?: string | null) =>
+		request(`/radiologyCenter/questionnaires/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	deleteQuestionnaire: (id: string | number, token?: string | null) =>
+		request(`/radiologyCenter/questionnaires/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
+	questionnaireAnswers: (id: string | number, token?: string | null) =>
+		request(`/radiologyCenter/questionnaires/${id}/answers`, { token: token ?? getOrganizationToken() ?? undefined }),
 };
 
 // Medical Laboratory dashboard (Bearer token)
@@ -1166,9 +1380,9 @@ export const labApi = {
 					reservation_id?: number | null;
 					date: string;
 					doctor_name?: string | null;
-					payment: "paid" | "not_paid";
 					report?: string | null;
 					services?: Array<{ lab_service_id: number; value?: string | null }>;
+					payments?: Array<{ date: string; amount: number; remaining: number; payment_way?: string }>;
 			  }
 			| FormData,
 		token?: string | null,
@@ -1181,15 +1395,35 @@ export const labApi = {
 					reservation_id?: number | null;
 					date: string;
 					doctor_name?: string | null;
-					payment: "paid" | "not_paid";
 					report?: string | null;
 					services?: Array<{ lab_service_id: number; value?: string | null }>;
+					payments?: Array<{ date: string; amount: number; remaining: number; payment_way?: string }>;
 			  }
 			| FormData,
 		token?: string | null,
-	) => request(`/medicalLaboratory/medical-analyses/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	) => {
+		if (typeof FormData !== "undefined" && data instanceof FormData) {
+			data.set("_method", "PUT");
+			return request(`/medicalLaboratory/medical-analyses/${id}`, { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined });
+		}
+		return request(`/medicalLaboratory/medical-analyses/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined });
+	},
 	deleteMedicalAnalysis: (id: string | number, token?: string | null) =>
 		request(`/medicalLaboratory/medical-analyses/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
+	questionnaires: (params?: Record<string, string>, token?: string | null) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/medicalLaboratory/questionnaires${q}`, { token: token ?? getOrganizationToken() ?? undefined });
+	},
+	questionnaire: (id: string | number, token?: string | null) =>
+		request(`/medicalLaboratory/questionnaires/${id}`, { token: token ?? getOrganizationToken() ?? undefined }),
+	createQuestionnaire: (data: QuestionnaireInput, token?: string | null) =>
+		request("/medicalLaboratory/questionnaires", { method: "POST", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	updateQuestionnaire: (id: string | number, data: QuestionnaireInput, token?: string | null) =>
+		request(`/medicalLaboratory/questionnaires/${id}`, { method: "PUT", body: data, token: token ?? getOrganizationToken() ?? undefined }),
+	deleteQuestionnaire: (id: string | number, token?: string | null) =>
+		request(`/medicalLaboratory/questionnaires/${id}`, { method: "DELETE", token: token ?? getOrganizationToken() ?? undefined }),
+	questionnaireAnswers: (id: string | number, token?: string | null) =>
+		request(`/medicalLaboratory/questionnaires/${id}/answers`, { token: token ?? getOrganizationToken() ?? undefined }),
 };
 
 export { BASE_URL };

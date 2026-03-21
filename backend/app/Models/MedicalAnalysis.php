@@ -102,6 +102,11 @@ class MedicalAnalysis extends Model implements HasMedia
     });
 }
 
+    public function payments()
+    {
+        return $this->morphMany(Payment::class, 'payable')->orderByDesc('payment_date')->orderByDesc('id');
+    }
+
 
 
     public function scopePaid($query)

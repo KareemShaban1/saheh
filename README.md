@@ -4,6 +4,11 @@
 
 **URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
+## Project documentation
+
+- [Project Modules](./PROJECT_MODULES.md)
+- [Organization User Flows](./ORGANIZATION_USER_FLOWS.md)
+
 ## How can I edit this code?
 
 There are several ways of editing your application.

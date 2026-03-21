@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Eye, Plus, Search } from "lucide-react";
+import { Edit, Eye, FileText, Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,11 +19,33 @@ type ServiceRow = {
   doctor_name?: string | null;
   notes?: string | null;
   status?: string;
+  service_instructions?: {
+    id?: number;
+    instructions?: string | null;
+    type?: "pre" | "post" | string;
+    notes?: string | null;
+  }[];
+  service_instructions_count?: number;
 };
 
 type DoctorOption = {
   id: number;
   name?: string;
+};
+
+type ServiceInstructionForm = {
+  instructions: string;
+  type: "pre" | "post";
+  notes: string;
+};
+
+type InstructionModalService = {
+  id: string;
+  service_name: string;
+  doctor_id: number | null;
+  type: "main" | "sub";
+  price: number;
+  notes: string | null;
 };
 
 export default function ClinicServices() {
@@ -32,6 +54,9 @@ export default function ClinicServices() {
   const [page, setPage] = useState(1);
   const [dialogMode, setDialogMode] = useState<"add" | "edit" | "show" | null>(null);
   const [activeId, setActiveId] = useState<string>("");
+  const [isInstructionModalOpen, setIsInstructionModalOpen] = useState(false);
+  const [instructionService, setInstructionService] = useState<InstructionModalService | null>(null);
+  const [instructionForm, setInstructionForm] = useState<ServiceInstructionForm[]>([]);
   const [form, setForm] = useState({
     service_name: "",
     doctor_id: "",
@@ -67,7 +92,7 @@ export default function ClinicServices() {
   }, [doctorsData]);
 
   const createMutation = useMutation({
-    mutationFn: (payload: { service_name: string; doctor_id?: number | null; type: "main" | "sub"; price: number; notes?: string | null }) =>
+    mutationFn: (payload: { service_name: string; doctor_id?: number | null; type: "main" | "sub"; price: number; notes?: string | null; service_instructions?: ServiceInstructionForm[] }) =>
       clinicApi.createService(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clinic", "services"] });
@@ -80,7 +105,7 @@ export default function ClinicServices() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (args: { id: string; payload: { service_name: string; doctor_id?: number | null; type: "main" | "sub"; price: number; notes?: string | null } }) =>
+    mutationFn: (args: { id: string; payload: { service_name: string; doctor_id?: number | null; type: "main" | "sub"; price: number; notes?: string | null; service_instructions?: ServiceInstructionForm[] } }) =>
       clinicApi.updateService(args.id, args.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clinic", "services"] });
@@ -89,6 +114,21 @@ export default function ClinicServices() {
     },
     onError: (err: unknown) => {
       toast({ title: err instanceof Error ? err.message : "Failed to update service", variant: "destructive" });
+    },
+  });
+
+  const updateInstructionsMutation = useMutation({
+    mutationFn: (args: { id: string; payload: { service_name: string; doctor_id?: number | null; type: "main" | "sub"; price: number; notes?: string | null; service_instructions?: ServiceInstructionForm[] } }) =>
+      clinicApi.updateService(args.id, args.payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clinic", "services"] });
+      toast({ title: "Service instructions updated" });
+      setIsInstructionModalOpen(false);
+      setInstructionService(null);
+      setInstructionForm([]);
+    },
+    onError: (err: unknown) => {
+      toast({ title: err instanceof Error ? err.message : "Failed to update service instructions", variant: "destructive" });
     },
   });
 
@@ -124,6 +164,46 @@ export default function ClinicServices() {
       type: s.category === "main" ? "main" : "sub",
       price: s.price ?? "0",
       notes: s.notes ?? "",
+    });
+  };
+
+  const openInstructionModal = (s: ServiceRow) => {
+    setInstructionService({
+      id: String(s.id),
+      service_name: s.name ?? "",
+      doctor_id: s.doctor_id ?? null,
+      type: s.category === "main" ? "main" : "sub",
+      price: Number(s.price ?? "0"),
+      notes: s.notes ?? null,
+    });
+    setInstructionForm(
+      (s.service_instructions ?? []).map((item) => ({
+        instructions: item.instructions ?? "",
+        type: item.type === "post" ? "post" : "pre",
+        notes: item.notes ?? "",
+      })),
+    );
+    setIsInstructionModalOpen(true);
+  };
+
+  const saveInstructions = () => {
+    if (!instructionService) return;
+    updateInstructionsMutation.mutate({
+      id: instructionService.id,
+      payload: {
+        service_name: instructionService.service_name,
+        doctor_id: instructionService.doctor_id,
+        type: instructionService.type,
+        price: instructionService.price,
+        notes: instructionService.notes,
+        service_instructions: instructionForm
+          .map((item) => ({
+            instructions: item.instructions.trim(),
+            type: item.type,
+            notes: item.notes.trim() || null,
+          }))
+          .filter((item) => item.instructions.length > 0),
+      },
     });
   };
 
@@ -183,13 +263,14 @@ export default function ClinicServices() {
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.type")}</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.doctor")}</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.price")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">Instructions</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("clinic.services.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.services.loading_services")}</td></tr>}
-              {error && <tr><td className="p-4 text-destructive" colSpan={6}>{error instanceof Error ? error.message : t("clinic.services.failed_to_load_services")}</td></tr>}
-              {!isLoading && !error && paged.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={6}>{t("clinic.services.no_services_found")}</td></tr>}
+              {isLoading && <tr><td className="p-4 text-muted-foreground" colSpan={7}>{t("clinic.services.loading_services")}</td></tr>}
+              {error && <tr><td className="p-4 text-destructive" colSpan={7}>{error instanceof Error ? error.message : t("clinic.services.failed_to_load_services")}</td></tr>}
+              {!isLoading && !error && paged.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={7}>{t("clinic.services.no_services_found")}</td></tr>}
               {paged.map((s) => (
                 <tr key={String(s.id)} className="hover:bg-muted/30 transition-colors">
                   <td className="p-4 text-muted-foreground">{String(s.id)}</td>
@@ -197,7 +278,17 @@ export default function ClinicServices() {
                   <td className="p-4 text-muted-foreground capitalize">{s.category ?? "sub"}</td>
                   <td className="p-4 text-muted-foreground">{s.doctor_name ?? "---"}</td>
                   <td className="p-4 text-muted-foreground">{s.price ?? "0"} EGP</td>
-                  <td className="p-4"><div className="flex gap-2"><Button variant="outline" size="sm" className="gap-2" onClick={() => openShow(s)}><Eye className="h-4 w-4" />{t("clinic.services.show")}</Button><Button variant="outline" size="sm" className="gap-2" onClick={() => openEdit(s)}><Edit className="h-4 w-4" />{t("clinic.services.edit")}</Button></div></td>
+                  <td className="p-4 text-muted-foreground">{s.service_instructions_count ?? s.service_instructions?.length ?? 0}</td>
+                  <td className="p-4">
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => openInstructionModal(s)}>
+                        <FileText className="h-4 w-4" />
+                        Instructions
+                      </Button>
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => openShow(s)}><Eye className="h-4 w-4" />{t("clinic.services.show")}</Button>
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => openEdit(s)}><Edit className="h-4 w-4" />{t("clinic.services.edit")}</Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -290,6 +381,92 @@ export default function ClinicServices() {
                 {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isInstructionModalOpen} onOpenChange={(open) => !open && setIsInstructionModalOpen(false)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Service Instructions {instructionService?.service_name ? `- ${instructionService.service_name}` : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 max-h-[70vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <Label>Instructions</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setInstructionForm((prev) => [...prev, { instructions: "", type: "pre", notes: "" }])}
+              >
+                Add Instruction
+              </Button>
+            </div>
+            {instructionForm.length === 0 && (
+              <p className="text-sm text-muted-foreground">No instructions found for this service.</p>
+            )}
+            {instructionForm.map((item, index) => (
+              <div key={`instructions-${index}`} className="rounded-lg border p-3 space-y-2">
+                <div className="grid sm:grid-cols-3 gap-2">
+                  <div className="sm:col-span-2 space-y-1">
+                    <Label>Instructions</Label>
+                    <Textarea
+                      value={item.instructions}
+                      onChange={(e) =>
+                        setInstructionForm((prev) =>
+                          prev.map((entry, i) => (i === index ? { ...entry, instructions: e.target.value } : entry)),
+                        )
+                      }
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Type</Label>
+                    <select
+                      title="Instructions type"
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                      value={item.type}
+                      onChange={(e) =>
+                        setInstructionForm((prev) =>
+                          prev.map((entry, i) => (i === index ? { ...entry, type: e.target.value as "pre" | "post" } : entry)),
+                        )
+                      }
+                    >
+                      <option value="pre">Before the service</option>
+                      <option value="post">After the service</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Notes</Label>
+                  <Textarea
+                    value={item.notes}
+                    onChange={(e) =>
+                      setInstructionForm((prev) =>
+                        prev.map((entry, i) => (i === index ? { ...entry, notes: e.target.value } : entry)),
+                      )
+                    }
+                    rows={2}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInstructionForm((prev) => prev.filter((_, i) => i !== index))}
+                >
+                  Delete
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInstructionModalOpen(false)}>
+              {t("clinic.services.close")}
+            </Button>
+            <Button onClick={saveInstructions} disabled={updateInstructionsMutation.isPending || !instructionService}>
+              {updateInstructionsMutation.isPending ? "Saving..." : t("clinic.services.save_instructions")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

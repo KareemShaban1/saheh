@@ -101,24 +101,57 @@ class MedicalLaboratoryDashboardApiController extends Controller
             ->where('organization_id', $orgId)
             ->where('organization_type', $orgType);
 
-        $paidTotal = (float) ((clone $base)
-            ->selectRaw("COALESCE(SUM(CASE WHEN payment='paid' THEN CAST(cost AS DECIMAL(12,2)) ELSE 0 END), 0) as total")
-            ->value('total') ?? 0);
-        $dueTotal = (float) ((clone $base)
-            ->selectRaw("COALESCE(SUM(CASE WHEN payment='not_paid' THEN CAST(cost AS DECIMAL(12,2)) ELSE 0 END), 0) as total")
-            ->value('total') ?? 0);
-        $paidCount = (int) ((clone $base)->where('payment', 'paid')->count());
-        $unpaidCount = (int) ((clone $base)->where('payment', 'not_paid')->count());
+        $analysisIds = (clone $base)->pluck('id');
+        $paidTotal = (float) \App\Models\Payment::query()
+            ->where('payable_type', MedicalAnalysis::class)
+            ->whereIn('payable_id', $analysisIds)
+            ->sum('amount');
 
-        $rows = (clone $base)
-            ->whereDate('date', '>=', $from->toDateString())
-            ->selectRaw("DATE_FORMAT(date, '%Y-%m') as ym")
-            ->selectRaw("COALESCE(SUM(CASE WHEN payment='paid' THEN CAST(cost AS DECIMAL(12,2)) ELSE 0 END),0) as revenue")
-            ->selectRaw("COALESCE(SUM(CASE WHEN payment='not_paid' THEN CAST(cost AS DECIMAL(12,2)) ELSE 0 END),0) as due")
-            ->groupBy('ym')
-            ->orderBy('ym')
+        $latestRemainingPerAnalysis = \App\Models\Payment::query()
+            ->select('payable_id', 'remaining')
+            ->where('payable_type', MedicalAnalysis::class)
+            ->whereIn('payable_id', $analysisIds)
+            ->orderBy('payable_id')
+            ->orderByDesc('payment_date')
+            ->orderByDesc('id')
             ->get()
-            ->keyBy('ym');
+            ->groupBy('payable_id')
+            ->map(fn ($items) => (float) ($items->first()->remaining ?? 0));
+
+        $dueTotal = (float) $latestRemainingPerAnalysis->sum();
+        $paidCount = (int) $latestRemainingPerAnalysis->filter(fn ($remaining) => $remaining <= 0)->count();
+        $unpaidCount = (int) $latestRemainingPerAnalysis->filter(fn ($remaining) => $remaining > 0)->count();
+
+        $analysisMonthMap = (clone $base)
+            ->whereDate('date', '>=', $from->toDateString())
+            ->get(['id', 'date'])
+            ->mapWithKeys(fn ($analysis) => [$analysis->id => Carbon::parse($analysis->date)->format('Y-m')]);
+
+        $paymentRows = \App\Models\Payment::query()
+            ->where('payable_type', MedicalAnalysis::class)
+            ->whereIn('payable_id', $analysisMonthMap->keys())
+            ->get();
+
+        $rows = collect();
+        foreach ($paymentRows as $paymentRow) {
+            $ym = $analysisMonthMap->get((int) $paymentRow->payable_id);
+            if (!$ym) {
+                continue;
+            }
+            $bucket = $rows->get($ym, ['revenue' => 0.0, 'due' => 0.0]);
+            $bucket['revenue'] += (float) ($paymentRow->amount ?? 0);
+            $rows->put($ym, $bucket);
+        }
+
+        foreach ($latestRemainingPerAnalysis as $analysisId => $remaining) {
+            $ym = $analysisMonthMap->get((int) $analysisId);
+            if (!$ym) {
+                continue;
+            }
+            $bucket = $rows->get($ym, ['revenue' => 0.0, 'due' => 0.0]);
+            $bucket['due'] += (float) $remaining;
+            $rows->put($ym, $bucket);
+        }
 
         $trend = [];
         for ($i = 0; $i < $months; $i++) {
@@ -127,8 +160,8 @@ class MedicalLaboratoryDashboardApiController extends Controller
             $row = $rows->get($key);
             $trend[] = [
                 'month' => $pointDate->format('M Y'),
-                'revenue' => (float) ($row->revenue ?? 0),
-                'due' => (float) ($row->due ?? 0),
+                'revenue' => (float) ($row['revenue'] ?? 0),
+                'due' => (float) ($row['due'] ?? 0),
             ];
         }
 
@@ -1136,11 +1169,10 @@ class MedicalLaboratoryDashboardApiController extends Controller
 
         $authUser = request()->user();
         $query = MedicalAnalysis::query()
-            ->with(['patient:id,name', 'labServiceOptions'])
+            ->with(['patient:id,name', 'labServiceOptions', 'payments'])
             ->where('organization_id', $authUser->organization_id)
             ->where('organization_type', $authUser->organization_type)
             ->when($request->filled('date'), fn ($q) => $q->whereDate('date', $request->date))
-            ->when($request->filled('payment'), fn ($q) => $q->where('payment', $request->payment))
             ->when($request->filled('doctor_name') || $request->filled('doctor'), function ($q) use ($request) {
                 $doctor = trim((string) ($request->doctor_name ?? $request->doctor));
                 if ($doctor !== '') {
@@ -1159,18 +1191,22 @@ class MedicalLaboratoryDashboardApiController extends Controller
 
         $perPage = (int) $request->get('per_page', 15);
         $paginated = $query->paginate($perPage);
-        $data = $paginated->getCollection()->map(fn ($a) => [
-            'id' => $a->id,
-            'patient_id' => $a->patient_id,
-            'patient_name' => $a->patient?->name ?? 'N/A',
-            'date' => $a->date,
-            'doctor_name' => $a->doctor_name,
-            'payment' => $a->payment,
-            'cost' => (string) ($a->cost ?? 0),
-            'report' => $a->report,
-            'services_count' => $a->labServiceOptions->count(),
-            'created_at' => optional($a->created_at)->format('Y-m-d'),
-        ]);
+        $data = $paginated->getCollection()->map(function ($a) {
+            $paymentSummary = $this->paymentSummaryFromCollection($a->payments ?? collect());
+            return [
+                'id' => $a->id,
+                'patient_id' => $a->patient_id,
+                'patient_name' => $a->patient?->name ?? 'N/A',
+                'date' => $a->date,
+                'doctor_name' => $a->doctor_name,
+                'payment' => $paymentSummary['status'],
+                'remaining' => $paymentSummary['remaining'],
+                'paid_amount' => $paymentSummary['paid_amount'],
+                'report' => $a->report,
+                'services_count' => $a->labServiceOptions->count(),
+                'created_at' => optional($a->created_at)->format('Y-m-d'),
+            ];
+        });
 
         return $this->returnJSON([
             'data' => $data,
@@ -1187,10 +1223,12 @@ class MedicalLaboratoryDashboardApiController extends Controller
 
         $authUser = request()->user();
         $analysis = MedicalAnalysis::query()
-            ->with(['patient:id,name', 'labServiceOptions.labService:id,lab_service_category_id,name'])
+            ->with(['patient:id,name', 'labServiceOptions.labService:id,lab_service_category_id,name', 'payments'])
             ->where('organization_id', $authUser->organization_id)
             ->where('organization_type', $authUser->organization_type)
             ->findOrFail($id);
+
+        $paymentSummary = $this->paymentSummaryFromCollection($analysis->payments ?? collect());
 
         $services = $analysis->labServiceOptions->map(fn ($option) => [
             'id' => $option->id,
@@ -1212,8 +1250,10 @@ class MedicalLaboratoryDashboardApiController extends Controller
             'reservation_id' => $analysis->reservation_id,
             'date' => $analysis->date,
             'doctor_name' => $analysis->doctor_name,
-            'payment' => $analysis->payment,
-            'cost' => (string) ($analysis->cost ?? 0),
+            'payment' => $paymentSummary['status'],
+            'remaining' => $paymentSummary['remaining'],
+            'paid_amount' => $paymentSummary['paid_amount'],
+            'payment_history' => $this->formatPayments($analysis->payments ?? collect(), MedicalAnalysis::class, (int) $analysis->id),
             'report' => $analysis->report,
             'services' => $services,
             'created_at' => optional($analysis->created_at)->format('Y-m-d'),
@@ -1227,18 +1267,29 @@ class MedicalLaboratoryDashboardApiController extends Controller
     {
         $this->ensureLabAuth();
 
+        if ($request->has('payments') && is_string($request->input('payments'))) {
+            $decodedPayments = json_decode((string) $request->input('payments'), true);
+            if (is_array($decodedPayments)) {
+                $request->merge(['payments' => $decodedPayments]);
+            }
+        }
+
         $validated = $request->validate([
             'patient_id' => 'required|integer|exists:patients,id',
             'reservation_id' => 'nullable|integer|exists:reservations,id',
             'date' => 'required|date',
             'doctor_name' => 'nullable|string|max:255',
-            'payment' => 'required|in:paid,not_paid',
             'report' => 'nullable|string',
             'services' => 'nullable|array',
             'services.*.lab_service_id' => 'required|integer|exists:lab_services,id',
             'services.*.value' => 'nullable|string|max:255',
             'services.*.images' => 'nullable|array',
             'services.*.images.*' => 'nullable|file|max:10240',
+            'payments' => 'nullable|array',
+            'payments.*.date' => 'required_with:payments|date',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0',
+            'payments.*.remaining' => 'required_with:payments|numeric|min:0',
+            'payments.*.payment_way' => 'nullable|string|max:100',
         ]);
 
         $authUser = request()->user();
@@ -1249,9 +1300,7 @@ class MedicalLaboratoryDashboardApiController extends Controller
                 'reservation_id' => $validated['reservation_id'] ?? null,
                 'date' => $validated['date'],
                 'doctor_name' => $validated['doctor_name'] ?? null,
-                'payment' => $validated['payment'],
                 'report' => $validated['report'] ?? null,
-                'cost' => '0',
                 'organization_id' => $authUser->organization_id,
                 'organization_type' => $authUser->organization_type,
             ]);
@@ -1285,7 +1334,7 @@ class MedicalLaboratoryDashboardApiController extends Controller
                 }
             }
 
-            $analysis->update(['cost' => (string) $total]);
+            $this->syncPayments($analysis, $validated['payments'] ?? []);
 
             return $analysis;
         });
@@ -1300,12 +1349,18 @@ class MedicalLaboratoryDashboardApiController extends Controller
     {
         $this->ensureLabAuth();
 
+        if ($request->has('payments') && is_string($request->input('payments'))) {
+            $decodedPayments = json_decode((string) $request->input('payments'), true);
+            if (is_array($decodedPayments)) {
+                $request->merge(['payments' => $decodedPayments]);
+            }
+        }
+
         $validated = $request->validate([
             'patient_id' => 'required|integer|exists:patients,id',
             'reservation_id' => 'nullable|integer|exists:reservations,id',
             'date' => 'required|date',
             'doctor_name' => 'nullable|string|max:255',
-            'payment' => 'required|in:paid,not_paid',
             'report' => 'nullable|string',
             'services' => 'nullable|array',
             'services.*.option_id' => 'nullable|integer|exists:lab_service_options,id',
@@ -1313,6 +1368,11 @@ class MedicalLaboratoryDashboardApiController extends Controller
             'services.*.value' => 'nullable|string|max:255',
             'services.*.images' => 'nullable|array',
             'services.*.images.*' => 'nullable|file|max:10240',
+            'payments' => 'nullable|array',
+            'payments.*.date' => 'required_with:payments|date',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0',
+            'payments.*.remaining' => 'required_with:payments|numeric|min:0',
+            'payments.*.payment_way' => 'nullable|string|max:100',
         ]);
 
         $authUser = request()->user();
@@ -1328,9 +1388,7 @@ class MedicalLaboratoryDashboardApiController extends Controller
                 'reservation_id' => $validated['reservation_id'] ?? null,
                 'date' => $validated['date'],
                 'doctor_name' => $validated['doctor_name'] ?? null,
-                'payment' => $validated['payment'],
                 'report' => $validated['report'] ?? null,
-                'cost' => '0',
             ]);
 
             $existingOptions = LabServiceOption::query()
@@ -1385,7 +1443,7 @@ class MedicalLaboratoryDashboardApiController extends Controller
                 ->when(empty($submittedOptionIds), fn ($q) => $q)
                 ->delete();
 
-            $analysis->update(['cost' => (string) $total]);
+            $this->syncPayments($analysis, $validated['payments'] ?? []);
 
             return $analysis;
         });
@@ -1421,6 +1479,54 @@ class MedicalLaboratoryDashboardApiController extends Controller
             'from' => $paginated->firstItem(),
             'to' => $paginated->lastItem(),
         ];
+    }
+
+    private function syncPayments($module, array $rows): void
+    {
+        $module->payments()->delete();
+
+        $normalized = collect($rows)
+            ->filter(fn ($row) => is_array($row))
+            ->map(fn ($row) => [
+                'payment_date' => !empty($row['date']) ? \Illuminate\Support\Carbon::parse((string) $row['date'])->format('Y-m-d H:i:s') : '',
+                'amount' => (float) ($row['amount'] ?? 0),
+                'remaining' => (float) ($row['remaining'] ?? 0),
+                'payment_way' => isset($row['payment_way']) ? trim((string) $row['payment_way']) : null,
+            ])
+            ->filter(fn ($row) => $row['payment_date'] !== '')
+            ->values()
+            ->all();
+
+        if (!empty($normalized)) {
+            $module->payments()->createMany($normalized);
+        }
+    }
+
+    private function paymentSummaryFromCollection($payments): array
+    {
+        $payments = collect($payments);
+        $paidAmount = (float) $payments->sum(fn ($p) => (float) ($p->amount ?? 0));
+        $latestRemaining = $payments->sortByDesc(fn ($p) => (string) ($p->payment_date ?? ''))->first()?->remaining;
+        $remaining = (float) ($latestRemaining ?? 0);
+
+        return [
+            'paid_amount' => $paidAmount,
+            'remaining' => $remaining,
+            'status' => $remaining > 0 ? 'not_paid' : 'paid',
+        ];
+    }
+
+    private function formatPayments($payments, string $moduleType, int $moduleId)
+    {
+        return collect($payments)->map(fn ($p) => [
+            'id' => $p->id,
+            'module_id' => $moduleId,
+            'module_type' => class_basename($moduleType),
+            'date' => $p->payment_date ? \Illuminate\Support\Carbon::parse($p->payment_date)->format('Y-m-d H:i:s') : '',
+            'amount' => (float) ($p->amount ?? 0),
+            'remaining' => (float) ($p->remaining ?? 0),
+            'payment_way' => $p->payment_way,
+        ])->values();
     }
 
     private function resolveLabRole(int $roleId, int $organizationId): Role

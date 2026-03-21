@@ -18,13 +18,15 @@ return new class extends Migration
             $table->foreignId('patient_id')->references('id')->on('patients')->cascadeOnDelete();
             $table->foreignId('doctor_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreignId('clinic_id')->references('id')->on('clinics')->cascadeOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('reservations')->nullOnDelete();
+            $table->enum('type', ['reservation', 'session'])->default('reservation');
             $table->string('reservation_number')->nullable();
             $table->string('slot')->nullable();
             $table->longText('first_diagnosis')->nullable();
             $table->longText('final_diagnosis')->nullable();
             // $table->enum('type', ['check', 'recheck' ,'consultation','other'])->default('check');
             $table->string('cost')->nullable();
-            $table->enum('payment', ['paid', 'not_paid'])->default('not_paid');
+            $table->enum('payment', ['paid', 'not_paid', 'partially_paid'])->default('not_paid');
             $table->date('date');
             $table->string('month');
             $table->enum('status',['waiting','entered','finished','cancelled'])->default('waiting');

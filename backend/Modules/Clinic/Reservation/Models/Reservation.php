@@ -5,6 +5,7 @@ namespace Modules\Clinic\Reservation\Models;
 use App\Models\MedicalAnalysis;
 use Modules\Clinic\GlassesDistance\Models\GlassesDistance;
 use App\Models\Ray;
+use App\Models\Payment;
 use Modules\Clinic\Prescription\Models\Prescription;
 use App\Models\Clinic;
 use App\Models\ModuleService;
@@ -40,6 +41,8 @@ class Reservation extends Model implements HasMedia
         'patient_id',
         'clinic_id',
         'doctor_id',
+        'parent_id',
+        'type',
         'reservation_number',
         'first_diagnosis',
         'final_diagnosis',
@@ -149,6 +152,16 @@ class Reservation extends Model implements HasMedia
         );
     }
 
+    public function parent()
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function sessions()
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
     public function scopePatient($query)
     {
         return $query->where('patient_id', auth()->id());
@@ -165,6 +178,11 @@ class Reservation extends Model implements HasMedia
             ->with(['service' => function ($query) {
                 $query->withoutGlobalScopes();
             }]);
+    }
+
+    public function payments()
+    {
+        return $this->morphMany(Payment::class, 'payable')->orderByDesc('payment_date')->orderByDesc('id');
     }
 
 

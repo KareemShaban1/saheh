@@ -83,24 +83,57 @@ class RadiologyCenterDashboardApiController extends Controller
             ->where('organization_id', $orgId)
             ->where('organization_type', $orgType);
 
-        $paidTotal = (float) ((clone $base)
-            ->selectRaw("COALESCE(SUM(CASE WHEN payment='paid' THEN CAST(cost AS DECIMAL(12,2)) ELSE 0 END), 0) as total")
-            ->value('total') ?? 0);
-        $dueTotal = (float) ((clone $base)
-            ->selectRaw("COALESCE(SUM(CASE WHEN payment='not_paid' THEN CAST(cost AS DECIMAL(12,2)) ELSE 0 END), 0) as total")
-            ->value('total') ?? 0);
-        $paidCount = (int) ((clone $base)->where('payment', 'paid')->count());
-        $unpaidCount = (int) ((clone $base)->where('payment', 'not_paid')->count());
+        $rayIds = (clone $base)->pluck('id');
+        $paidTotal = (float) \App\Models\Payment::query()
+            ->where('payable_type', Ray::class)
+            ->whereIn('payable_id', $rayIds)
+            ->sum('amount');
 
-        $rows = (clone $base)
-            ->whereDate('date', '>=', $from->toDateString())
-            ->selectRaw("DATE_FORMAT(date, '%Y-%m') as ym")
-            ->selectRaw("COALESCE(SUM(CASE WHEN payment='paid' THEN CAST(cost AS DECIMAL(12,2)) ELSE 0 END),0) as revenue")
-            ->selectRaw("COALESCE(SUM(CASE WHEN payment='not_paid' THEN CAST(cost AS DECIMAL(12,2)) ELSE 0 END),0) as due")
-            ->groupBy('ym')
-            ->orderBy('ym')
+        $latestRemainingPerRay = \App\Models\Payment::query()
+            ->select('payable_id', 'remaining')
+            ->where('payable_type', Ray::class)
+            ->whereIn('payable_id', $rayIds)
+            ->orderBy('payable_id')
+            ->orderByDesc('payment_date')
+            ->orderByDesc('id')
             ->get()
-            ->keyBy('ym');
+            ->groupBy('payable_id')
+            ->map(fn ($items) => (float) ($items->first()->remaining ?? 0));
+
+        $dueTotal = (float) $latestRemainingPerRay->sum();
+        $paidCount = (int) $latestRemainingPerRay->filter(fn ($remaining) => $remaining <= 0)->count();
+        $unpaidCount = (int) $latestRemainingPerRay->filter(fn ($remaining) => $remaining > 0)->count();
+
+        $rayMonthMap = (clone $base)
+            ->whereDate('date', '>=', $from->toDateString())
+            ->get(['id', 'date'])
+            ->mapWithKeys(fn ($ray) => [$ray->id => Carbon::parse($ray->date)->format('Y-m')]);
+
+        $paymentRows = \App\Models\Payment::query()
+            ->where('payable_type', Ray::class)
+            ->whereIn('payable_id', $rayMonthMap->keys())
+            ->get();
+
+        $rows = collect();
+        foreach ($paymentRows as $paymentRow) {
+            $ym = $rayMonthMap->get((int) $paymentRow->payable_id);
+            if (!$ym) {
+                continue;
+            }
+            $bucket = $rows->get($ym, ['revenue' => 0.0, 'due' => 0.0]);
+            $bucket['revenue'] += (float) ($paymentRow->amount ?? 0);
+            $rows->put($ym, $bucket);
+        }
+
+        foreach ($latestRemainingPerRay as $rayId => $remaining) {
+            $ym = $rayMonthMap->get((int) $rayId);
+            if (!$ym) {
+                continue;
+            }
+            $bucket = $rows->get($ym, ['revenue' => 0.0, 'due' => 0.0]);
+            $bucket['due'] += (float) $remaining;
+            $rows->put($ym, $bucket);
+        }
 
         $trend = [];
         for ($i = 0; $i < $months; $i++) {
@@ -109,8 +142,8 @@ class RadiologyCenterDashboardApiController extends Controller
             $row = $rows->get($key);
             $trend[] = [
                 'month' => $pointDate->format('M Y'),
-                'revenue' => (float) ($row->revenue ?? 0),
-                'due' => (float) ($row->due ?? 0),
+                'revenue' => (float) ($row['revenue'] ?? 0),
+                'due' => (float) ($row['due'] ?? 0),
             ];
         }
 
@@ -780,7 +813,7 @@ class RadiologyCenterDashboardApiController extends Controller
         $user = request()->user();
 
         $query = Ray::withoutGlobalScope(\App\Models\Scopes\RadiologyCenterScope::class)
-            ->with('patient:id,name')
+            ->with(['patient:id,name', 'payments'])
             ->where('organization_id', $user->organization_id)
             ->where('organization_type', $user->organization_type)
             ->when($request->filled('search'), function ($q) use ($request) {
@@ -796,14 +829,16 @@ class RadiologyCenterDashboardApiController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $paginated = $query->paginate($perPage);
         $data = collect($paginated->items())->map(function ($ray) {
+            $paymentSummary = $this->paymentSummaryFromCollection($ray->payments ?? collect());
             return [
                 'id' => $ray->id,
                 'patient_id' => $ray->patient_id,
                 'patient_name' => $ray->patient?->name,
                 'reservation_id' => $ray->reservation_id,
                 'date' => $ray->date,
-                'payment' => $ray->payment,
-                'cost' => $ray->cost,
+                'payment' => $paymentSummary['status'],
+                'remaining' => $paymentSummary['remaining'],
+                'paid_amount' => $paymentSummary['paid_amount'],
                 'report' => $ray->report,
                 'images_count' => $ray->getMedia('ray_images')->count(),
                 'status' => $ray->deleted_at ? 'inactive' : 'active',
@@ -822,10 +857,12 @@ class RadiologyCenterDashboardApiController extends Controller
         $user = request()->user();
 
         $ray = Ray::withoutGlobalScope(\App\Models\Scopes\RadiologyCenterScope::class)
-            ->with('patient:id,name')
+            ->with(['patient:id,name', 'payments'])
             ->where('organization_id', $user->organization_id)
             ->where('organization_type', $user->organization_type)
             ->findOrFail($id);
+
+        $paymentSummary = $this->paymentSummaryFromCollection($ray->payments ?? collect());
 
         return $this->returnJSON([
             'id' => $ray->id,
@@ -833,8 +870,10 @@ class RadiologyCenterDashboardApiController extends Controller
             'patient_name' => $ray->patient?->name,
             'reservation_id' => $ray->reservation_id,
             'date' => $ray->date,
-            'payment' => $ray->payment,
-            'cost' => $ray->cost,
+            'payment' => $paymentSummary['status'],
+            'remaining' => $paymentSummary['remaining'],
+            'paid_amount' => $paymentSummary['paid_amount'],
+            'payment_history' => $this->formatPayments($ray->payments ?? collect(), Ray::class, (int) $ray->id),
             'report' => $ray->report,
             'images' => $ray->getMedia('ray_images')->map(fn ($m) => $m->getUrl())->values()->all(),
         ], 'Ray details', 'success');
@@ -845,13 +884,23 @@ class RadiologyCenterDashboardApiController extends Controller
         $this->ensureRadiologyAuth();
         $user = request()->user();
 
+        if ($request->has('payments') && is_string($request->input('payments'))) {
+            $decodedPayments = json_decode((string) $request->input('payments'), true);
+            if (is_array($decodedPayments)) {
+                $request->merge(['payments' => $decodedPayments]);
+            }
+        }
+
         $validated = $request->validate([
             'patient_id' => 'required|integer|exists:patients,id',
             'reservation_id' => 'nullable|integer|exists:reservations,id',
             'date' => 'required|date',
-            'payment' => 'required|in:paid,not_paid',
-            'cost' => 'nullable|numeric|min:0',
             'report' => 'nullable|string|max:5000',
+            'payments' => 'nullable|array',
+            'payments.*.date' => 'required_with:payments|date',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0',
+            'payments.*.remaining' => 'required_with:payments|numeric|min:0',
+            'payments.*.payment_way' => 'nullable|string|max:100',
             'images' => 'nullable|array',
             'images.*' => 'file|max:10240',
         ]);
@@ -862,10 +911,10 @@ class RadiologyCenterDashboardApiController extends Controller
             'organization_id' => $user->organization_id,
             'organization_type' => $user->organization_type,
             'date' => $validated['date'],
-            'payment' => $validated['payment'],
-            'cost' => isset($validated['cost']) ? (string) $validated['cost'] : null,
             'report' => $validated['report'] ?? null,
         ]);
+
+        $this->syncPayments($ray, $validated['payments'] ?? []);
 
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $image) {
@@ -881,6 +930,13 @@ class RadiologyCenterDashboardApiController extends Controller
         $this->ensureRadiologyAuth();
         $user = request()->user();
 
+        if ($request->has('payments') && is_string($request->input('payments'))) {
+            $decodedPayments = json_decode((string) $request->input('payments'), true);
+            if (is_array($decodedPayments)) {
+                $request->merge(['payments' => $decodedPayments]);
+            }
+        }
+
         $ray = Ray::withoutGlobalScope(\App\Models\Scopes\RadiologyCenterScope::class)
             ->where('organization_id', $user->organization_id)
             ->where('organization_type', $user->organization_type)
@@ -890,9 +946,12 @@ class RadiologyCenterDashboardApiController extends Controller
             'patient_id' => 'required|integer|exists:patients,id',
             'reservation_id' => 'nullable|integer|exists:reservations,id',
             'date' => 'required|date',
-            'payment' => 'required|in:paid,not_paid',
-            'cost' => 'nullable|numeric|min:0',
             'report' => 'nullable|string|max:5000',
+            'payments' => 'nullable|array',
+            'payments.*.date' => 'required_with:payments|date',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0',
+            'payments.*.remaining' => 'required_with:payments|numeric|min:0',
+            'payments.*.payment_way' => 'nullable|string|max:100',
             'images' => 'nullable|array',
             'images.*' => 'file|max:10240',
         ]);
@@ -901,10 +960,10 @@ class RadiologyCenterDashboardApiController extends Controller
             'patient_id' => (int) $validated['patient_id'],
             'reservation_id' => isset($validated['reservation_id']) ? (int) $validated['reservation_id'] : null,
             'date' => $validated['date'],
-            'payment' => $validated['payment'],
-            'cost' => isset($validated['cost']) ? (string) $validated['cost'] : null,
             'report' => $validated['report'] ?? null,
         ]);
+
+        $this->syncPayments($ray, $validated['payments'] ?? []);
 
         if ($request->hasFile('images')) {
             $ray->clearMediaCollection('ray_images');
@@ -1164,6 +1223,54 @@ class RadiologyCenterDashboardApiController extends Controller
                 'total' => $paginated->total(),
             ],
         ], 'Notifications', 'success');
+    }
+
+    private function syncPayments($module, array $rows): void
+    {
+        $module->payments()->delete();
+
+        $normalized = collect($rows)
+            ->filter(fn ($row) => is_array($row))
+            ->map(fn ($row) => [
+                'payment_date' => !empty($row['date']) ? \Illuminate\Support\Carbon::parse((string) $row['date'])->format('Y-m-d H:i:s') : '',
+                'amount' => (float) ($row['amount'] ?? 0),
+                'remaining' => (float) ($row['remaining'] ?? 0),
+                'payment_way' => isset($row['payment_way']) ? trim((string) $row['payment_way']) : null,
+            ])
+            ->filter(fn ($row) => $row['payment_date'] !== '')
+            ->values()
+            ->all();
+
+        if (!empty($normalized)) {
+            $module->payments()->createMany($normalized);
+        }
+    }
+
+    private function paymentSummaryFromCollection($payments): array
+    {
+        $payments = collect($payments);
+        $paidAmount = (float) $payments->sum(fn ($p) => (float) ($p->amount ?? 0));
+        $latestRemaining = $payments->sortByDesc(fn ($p) => (string) ($p->payment_date ?? ''))->first()?->remaining;
+        $remaining = (float) ($latestRemaining ?? 0);
+
+        return [
+            'paid_amount' => $paidAmount,
+            'remaining' => $remaining,
+            'status' => $remaining > 0 ? 'not_paid' : 'paid',
+        ];
+    }
+
+    private function formatPayments($payments, string $moduleType, int $moduleId)
+    {
+        return collect($payments)->map(fn ($p) => [
+            'id' => $p->id,
+            'module_id' => $moduleId,
+            'module_type' => class_basename($moduleType),
+            'date' => $p->payment_date ? \Illuminate\Support\Carbon::parse($p->payment_date)->format('Y-m-d H:i:s') : '',
+            'amount' => (float) ($p->amount ?? 0),
+            'remaining' => (float) ($p->remaining ?? 0),
+            'payment_way' => $p->payment_way,
+        ])->values();
     }
 
     private function ensureRadiologyAuth(): void

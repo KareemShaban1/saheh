@@ -1,5 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Award,
@@ -14,6 +16,8 @@ import {
   UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { publicApi } from "@/lib/api";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 type DoctorProfile = {
   id: string;
@@ -65,6 +69,33 @@ const doctorsDirectory: Record<string, DoctorProfile> = {
 export default function DoctorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const doctor = doctorsDirectory[id ?? ""] ?? doctorsDirectory["1"];
+  const doctorId = Number(id ?? doctor.id);
+
+  const mediaQuery = useQuery({
+    queryKey: ["public", "media", "doctor", doctorId],
+    queryFn: () => publicApi.organizationMedia({ owner_type: "doctor", owner_id: doctorId, limit: 30 }),
+    enabled: doctorId > 0,
+  });
+
+  const media = useMemo(() => {
+    const root = (mediaQuery.data as { data?: unknown } | undefined)?.data ?? mediaQuery.data;
+    return (Array.isArray(root) ? root : ((root as { data?: Array<{ id: number; media_type: string; title?: string; file_url: string }> } | undefined)?.data ?? []));
+  }, [mediaQuery.data]);
+  const stories = media.filter((item) => item.media_type === "story");
+  const [activeStory, setActiveStory] = useState<(typeof stories)[number] | null>(null);
+
+  useEffect(() => {
+    if (!activeStory || stories.length === 0) return;
+    const timer = window.setTimeout(() => {
+      const idx = stories.findIndex((s) => s.id === activeStory.id);
+      if (idx === -1 || idx === stories.length - 1) {
+        setActiveStory(null);
+        return;
+      }
+      setActiveStory(stories[idx + 1]);
+    }, 8000);
+    return () => window.clearTimeout(timer);
+  }, [activeStory, stories]);
 
   return (
     <div className="container py-8 md:py-12">
@@ -180,6 +211,40 @@ export default function DoctorDetailPage() {
               ))}
             </div>
           </section>
+
+          {stories.length > 0 && (
+            <section className="bg-card rounded-2xl border p-6">
+              <h2 className="text-xl font-semibold">Stories</h2>
+              <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+                {stories.map((story) => (
+                  <button
+                    key={story.id}
+                    type="button"
+                    onClick={() => setActiveStory(story)}
+                    className="shrink-0 w-28 h-44 rounded-xl border bg-muted/20 p-2 text-left"
+                  >
+                    <p className="text-xs text-primary uppercase">Story</p>
+                    <p className="text-sm mt-2 line-clamp-3">{story.title || "Untitled story"}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="bg-card rounded-2xl border p-6">
+            <h2 className="text-xl font-semibold">Reels, Videos & Stories</h2>
+            <div className="mt-4 grid sm:grid-cols-2 gap-4">
+              {media.map((item) => (
+                <div key={item.id} className="rounded-xl border overflow-hidden">
+                  <video src={item.file_url} controls className="w-full h-56 object-cover bg-black" />
+                  <div className="p-3">
+                    <p className="text-xs text-primary uppercase">{item.media_type}</p>
+                    <p className="font-medium">{item.title || "Untitled"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
 
         <aside className="space-y-4">
@@ -206,6 +271,11 @@ export default function DoctorDetailPage() {
           </div>
         </aside>
       </motion.div>
+      <Dialog open={!!activeStory} onOpenChange={(open) => !open && setActiveStory(null)}>
+        <DialogContent className="max-w-xl p-0 overflow-hidden">
+          {activeStory && <video src={activeStory.file_url} controls autoPlay className="w-full h-[70vh] object-cover bg-black" />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

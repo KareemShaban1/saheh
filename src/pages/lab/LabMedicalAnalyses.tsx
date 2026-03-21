@@ -20,9 +20,11 @@ type AnalysisRow = {
   date?: string;
   doctor_name?: string | null;
   payment?: "paid" | "not_paid";
-  cost?: string;
+  remaining?: number;
+  paid_amount?: number;
   report?: string | null;
   services_count?: number;
+  payment_history?: Array<{ date?: string; amount?: number; remaining?: number; payment_way?: string | null }>;
 };
 
 type PatientRow = {
@@ -46,6 +48,12 @@ type AnalysisServiceRow = {
   existing_images?: string[];
 };
 
+type PaymentRow = {
+  date: string;
+  amount: string;
+  payment_way: "cash";
+};
+
 type LabMedicalAnalysesProps = {
   todayOnly?: boolean;
 };
@@ -66,9 +74,9 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
     reservation_id: "",
     date: "",
     doctor_name: "",
-    payment: "not_paid" as "paid" | "not_paid",
     report: "",
     services: [] as AnalysisServiceRow[],
+    payments: [] as PaymentRow[],
   });
   const perPage = 10;
   const queryClient = useQueryClient();
@@ -113,6 +121,15 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
     for (const s of services) map.set(String(s.id), s);
     return map;
   }, [services]);
+
+  const totalServicesCost = useMemo(
+    () =>
+      form.services.reduce((sum, row) => {
+        const service = row.lab_service_id ? serviceMap.get(row.lab_service_id) : undefined;
+        return sum + Number(service?.price ?? 0);
+      }, 0),
+    [form.services, serviceMap],
+  );
 
   const createMutation = useMutation({
     mutationFn: () => labApi.createMedicalAnalysis(toAnalysisFormData(form)),
@@ -165,9 +182,9 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
       reservation_id: "",
       date: "",
       doctor_name: "",
-      payment: "not_paid",
       report: "",
       services: [],
+      payments: [],
     });
   };
 
@@ -187,7 +204,6 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
       reservation_id: item.reservation_id ? String(item.reservation_id) : "",
       date: item.date ?? "",
       doctor_name: item.doctor_name ?? "",
-      payment: item.payment ?? "not_paid",
       report: item.report ?? "",
       services: (item.services ?? []).map((s) => ({
         option_id: s.option_id ? String(s.option_id) : undefined,
@@ -195,6 +211,11 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
         value: s.value ?? "",
         images: [],
         existing_images: s.images ?? [],
+      })),
+      payments: (item.payment_history ?? []).map((p) => ({
+        date: p.date ?? "",
+        amount: String(p.amount ?? 0),
+        payment_way: "cash",
       })),
     });
   };
@@ -330,20 +351,21 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("lab.medical_analyses.date")}</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("lab.medical_analyses.doctor")}</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("lab.medical_analyses.payment")}</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">{t("lab.medical_analyses.cost")}</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">Paid</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">Remaining</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("lab.medical_analyses.services")}</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">{t("lab.medical_analyses.actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {analysesQuery.isLoading && (
-                <tr><td className="p-4 text-muted-foreground" colSpan={8}>{t("lab.medical_analyses.loading_analyses")}</td></tr>
+                <tr><td className="p-4 text-muted-foreground" colSpan={9}>{t("lab.medical_analyses.loading_analyses")}</td></tr>
               )}
               {analysesQuery.error && (
-                <tr><td className="p-4 text-destructive" colSpan={8}>{analysesQuery.error instanceof Error ? analysesQuery.error.message : t("lab.medical_analyses.failed_to_load_analyses")}</td></tr>
+                <tr><td className="p-4 text-destructive" colSpan={9}>{analysesQuery.error instanceof Error ? analysesQuery.error.message : t("lab.medical_analyses.failed_to_load_analyses")}</td></tr>
               )}
               {!analysesQuery.isLoading && !analysesQuery.error && analyses.length === 0 && (
-                <tr><td className="p-4 text-muted-foreground" colSpan={8}>{t("lab.medical_analyses.no_analyses_found")}</td></tr>
+                <tr><td className="p-4 text-muted-foreground" colSpan={9}>{t("lab.medical_analyses.no_analyses_found")}</td></tr>
               )}
               {!analysesQuery.isLoading && !analysesQuery.error && analyses.map((a) => (
                 <tr key={String(a.id)} className="hover:bg-muted/30 transition-colors">
@@ -352,7 +374,8 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
                   <td className="p-4 text-muted-foreground">{a.date ?? t("lab.medical_analyses.unknown")}</td>
                   <td className="p-4 text-muted-foreground">{a.doctor_name ?? t("lab.medical_analyses.unknown")}</td>
                   <td className="p-4"><Badge variant={a.payment === "paid" ? "default" : "secondary"}>{a.payment ?? "not_paid"}</Badge></td>
-                  <td className="p-4 text-muted-foreground">{a.cost ?? "0"} EGP</td>
+                  <td className="p-4 text-muted-foreground">{a.paid_amount ?? 0} EGP</td>
+                  <td className="p-4 text-muted-foreground">{a.remaining ?? 0} EGP</td>
                   <td className="p-4 text-muted-foreground">{a.services_count ?? 0}</td>
                   <td className="p-4">
                     <div className="flex gap-2">
@@ -390,7 +413,7 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
             <DialogTitle>{dialogMode === "add" ? t("lab.medical_analyses.add") : dialogMode === "edit" ? t("lab.medical_analyses.edit") : t("lab.medical_analyses.details")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid sm:grid-cols-4 gap-4">
+            <div className="grid sm:grid-cols-3 gap-4">
               <div className="space-y-2 sm:col-span-2">
                 <Label>{t("lab.medical_analyses.patient")}</Label>
                 <Select value={form.patient_id} onValueChange={(value) => setForm((f) => ({ ...f, patient_id: value }))} disabled={dialogMode === "show"}>
@@ -408,16 +431,6 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
                 <Label>{t("lab.medical_analyses.date")}</Label>
                 <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} disabled={dialogMode === "show"} />
               </div>
-              <div className="space-y-2">
-                <Label>{t("lab.medical_analyses.payment")}</Label>
-                <Select value={form.payment} onValueChange={(value: "paid" | "not_paid") => setForm((f) => ({ ...f, payment: value }))} disabled={dialogMode === "show"}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="not_paid">{t("lab.medical_analyses.not_paid")}</SelectItem>
-                    <SelectItem value="paid">{t("lab.medical_analyses.paid")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
@@ -434,6 +447,59 @@ export default function LabMedicalAnalyses({ todayOnly = false }: LabMedicalAnal
             <div className="space-y-2">
               <Label>{t("lab.medical_analyses.report")}</Label>
               <Textarea rows={3} value={form.report} onChange={(e) => setForm((f) => ({ ...f, report: e.target.value }))} disabled={dialogMode === "show"} />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Payment History</Label>
+                {dialogMode !== "show" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setForm((f) => ({ ...f, payments: [...f.payments, { date: f.date || "", amount: "", payment_way: "cash" }] }))}
+                  >
+                    Add Payment
+                  </Button>
+                )}
+              </div>
+              {form.payments.length === 0 && <p className="text-sm text-muted-foreground">No payments.</p>}
+              {form.payments.map((row, index) => (
+                <div key={`payment-${index}`} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2">
+                  <div className="col-span-12 md:col-span-3">
+                    <Label className="text-xs">Date</Label>
+                    <Input type="date" value={row.date} disabled={dialogMode === "show"} onChange={(e) => setForm((f) => ({ ...f, payments: f.payments.map((p, i) => (i === index ? { ...p, date: e.target.value } : p)) }))} />
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <Label className="text-xs">Amount</Label>
+                    <Input type="number" min="0" value={row.amount} disabled={dialogMode === "show"} onChange={(e) => setForm((f) => ({ ...f, payments: f.payments.map((p, i) => (i === index ? { ...p, amount: e.target.value } : p)) }))} />
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <Label className="text-xs">Remaining</Label>
+                    <Input type="number" value={String(Number(row.amount || 0) - totalServicesCost)} readOnly disabled />
+                  </div>
+                  <div className="col-span-10 md:col-span-2">
+                    <Label className="text-xs">Way</Label>
+                    <Select
+                      value={row.payment_way}
+                      onValueChange={(value: "cash") => setForm((f) => ({ ...f, payments: f.payments.map((p, i) => (i === index ? { ...p, payment_way: value } : p)) }))}
+                      disabled={dialogMode === "show"}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select payment way" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">cash</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {dialogMode !== "show" && (
+                    <div className="col-span-2 md:col-span-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setForm((f) => ({ ...f, payments: f.payments.filter((_, i) => i !== index) }))}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
             <div className="space-y-3">
@@ -536,9 +602,9 @@ function toAnalysisFormData(form: {
   reservation_id: string;
   date: string;
   doctor_name: string;
-  payment: "paid" | "not_paid";
   report: string;
   services: AnalysisServiceRow[];
+  payments: PaymentRow[];
 }): FormData {
   const fd = new FormData();
   fd.append("patient_id", form.patient_id);
@@ -547,8 +613,20 @@ function toAnalysisFormData(form: {
   }
   fd.append("date", form.date);
   fd.append("doctor_name", form.doctor_name.trim());
-  fd.append("payment", form.payment);
   fd.append("report", form.report);
+  fd.append(
+    "payments",
+    JSON.stringify(
+      form.payments
+        .filter((row) => row.date && row.amount !== "")
+        .map((row) => ({
+          date: row.date,
+          amount: Number(row.amount || 0),
+          remaining: Number(row.amount || 0) - totalServicesCost,
+          payment_way: row.payment_way || undefined,
+        })),
+    ),
+  );
 
   form.services
     .filter((row) => row.lab_service_id)

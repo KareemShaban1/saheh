@@ -75,6 +75,8 @@ class RolePermissionSeeder extends Seeder
             'financial',
             'modules',
             'users',
+			'drugs',
+            'questionnaires',
         ];
 
         $clinics = Clinic::all();
@@ -100,6 +102,8 @@ class RolePermissionSeeder extends Seeder
                     'chat.*',
                     'chats.*',
                     'services.view',
+                    'drugs.view',
+                    'questionnaires.view',
                 ],
                 'clinic-user' => [
                     'dashboard.view',
@@ -112,6 +116,8 @@ class RolePermissionSeeder extends Seeder
                     'notifications.view',
                     'chat.*',
                     'chats.*',
+                    'drugs.view',
+                    'questionnaires.view',
                 ],
             ]);
         }

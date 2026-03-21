@@ -4,12 +4,15 @@ namespace Modules\Clinic\Prescription\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Clinic\Reservation\Models\Reservation;
 use App\Models\Clinic;
+use Modules\Clinic\Doctor\Models\Doctor;
 
 class Drug extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -32,5 +35,10 @@ class Drug extends Model
     public function clinic()
     {
         return $this->belongsTo(Clinic::class);
+    }
+
+    public function doctor()
+    {
+        return $this->belongsTo(Doctor::class);
     }
 }

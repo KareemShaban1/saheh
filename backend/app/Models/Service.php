@@ -61,6 +61,11 @@ class Service extends Model
         return $this->hasMany(ServiceOption::class);
     }
 
+    public function serviceInstructions()
+    {
+        return $this->hasMany(ServiceInstruction::class);
+    }
+
     /**
      * Backward-compatible alias for legacy code that still reads/writes "fee".
      */

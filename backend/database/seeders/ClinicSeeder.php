@@ -23,7 +23,8 @@ class ClinicSeeder extends Seeder
             "phone"=> "0123456789",
             "email"=> "clinic1@clinic.com",
             'start_date'=> Carbon::now(),
-            "status"=> 1,
+            "status"=> 'approved',
+            'is_active'=> true,
         ]);
 
         Clinic::create([
@@ -32,7 +33,8 @@ class ClinicSeeder extends Seeder
             "phone"=> "0123456789",
             "email"=> "clinic2@clinic.com",
             'start_date'=> Carbon::now(),
-            "status"=> 1,
+'is_active'=> true,
+            "status"=> 'approved',
         ]);
 
     }

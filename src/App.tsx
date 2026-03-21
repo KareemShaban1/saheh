@@ -21,6 +21,8 @@ import ClinicDetailPage from "@/pages/public/ClinicDetailPage";
 import DoctorDetailPage from "@/pages/public/DoctorDetailPage";
 import LabsPage from "@/pages/public/LabsPage";
 import RadiologyCentersPage from "@/pages/public/RadiologyCentersPage";
+import LabDetailPage from "@/pages/public/LabDetailPage";
+import RadiologyCenterDetailPage from "@/pages/public/RadiologyCenterDetailPage";
 
 // Patient pages
 import PatientAppointments from "@/pages/patient/PatientAppointments";
@@ -33,6 +35,8 @@ import PatientGlasses from "@/pages/patient/PatientGlasses";
 import PatientReviews from "@/pages/patient/PatientReviews";
 import PatientHome from "@/pages/patient/PatientHome";
 import PatientChat from "@/pages/patient/PatientChat";
+import PatientQuestionnaires from "@/pages/patient/PatientQuestionnaires";
+import PatientReelsPage from "@/pages/patient/PatientReelsPage";
 
 // Clinic pages
 import ClinicDashboardPage from "@/pages/clinic/ClinicDashboardPage";
@@ -51,12 +55,15 @@ import ClinicReviews from "@/pages/clinic/ClinicReviews";
 import ClinicAnnouncements from "@/pages/clinic/ClinicAnnouncements";
 import ClinicUsers from "@/pages/clinic/ClinicUsers";
 import ClinicServices from "@/pages/clinic/ClinicServices";
+import ClinicDrugs from "@/pages/clinic/ClinicDrugs";
+import ClinicQuestionnaires from "@/pages/clinic/ClinicQuestionnaires";
 import ClinicModules from "@/pages/clinic/ClinicModules";
 import ClinicInventory from "@/pages/clinic/ClinicInventory";
 import ClinicFinancial from "@/pages/clinic/ClinicFinancial";
 import ClinicNotifications from "@/pages/clinic/ClinicNotifications";
 import ClinicSettings from "@/pages/clinic/ClinicSettings";
 import OrganizationChatPage from "@/pages/shared/OrganizationChatPage";
+import OrganizationMediaPage from "@/pages/shared/OrganizationMediaPage";
 
 // Admin pages
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -83,6 +90,7 @@ import LabFinancial from "@/pages/lab/LabFinancial";
 import LabTodayMedicalAnalyses from "@/pages/lab/LabTodayMedicalAnalyses";
 import LabNotifications from "@/pages/lab/LabNotifications";
 import LabPatientHistoryPage from "@/pages/lab/LabPatientHistoryPage";
+import LabQuestionnaires from "@/pages/lab/LabQuestionnaires";
 
 // Radiology pages
 import RadiologyDashboard from "@/pages/radiology/RadiologyDashboard";
@@ -94,6 +102,7 @@ import RadiologyNotifications from "@/pages/radiology/RadiologyNotifications";
 import RadiologyUsers from "@/pages/radiology/RadiologyUsers";
 import RadiologyPatientHistoryPage from "@/pages/radiology/RadiologyPatientHistoryPage";
 import RadiologyRayCategories from "@/pages/radiology/RadiologyRayCategories";
+import RadiologyQuestionnaires from "@/pages/radiology/RadiologyQuestionnaires";
 
 // Auth pages
 import LoginPage from "@/pages/auth/LoginPage";
@@ -147,9 +156,9 @@ const App = () => (
               <Route path="/clinics/:id" element={<ClinicDetailPage />} />
               <Route path="/doctors/:id" element={<DoctorDetailPage />} />
               <Route path="/labs" element={<LabsPage />} />
-              <Route path="/labs/:id" element={<PlaceholderPage title="Lab Detail" description="Lab details and services. Connect to GET /medical-laboratory/{id}" icon={FlaskConical} />} />
+              <Route path="/labs/:id" element={<LabDetailPage />} />
               <Route path="/radiology-centers" element={<RadiologyCentersPage />} />
-              <Route path="/radiology-centers/:id" element={<PlaceholderPage title="Radiology Center Detail" description="Center details. Connect to GET /radiology-center/{id}" icon={ScanLine} />} />
+              <Route path="/radiology-centers/:id" element={<RadiologyCenterDetailPage />} />
             </Route>
 
             {/* Patient Dashboard (protected) */}
@@ -164,6 +173,8 @@ const App = () => (
             <Route path="/patient/glasses" element={<PatientGlasses />} />
             <Route path="/patient/reviews" element={<PatientReviews />} />
             <Route path="/patient/chat" element={<PatientChat />} />
+            <Route path="/patient/questionnaires" element={<PatientQuestionnaires />} />
+            <Route path="/patient/reels" element={<PatientReelsPage />} />
           </Route>
 
           {/* Clinic Dashboard */}
@@ -183,11 +194,14 @@ const App = () => (
             <Route path="/clinic-dashboard/patients/:id/history" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["patients"]}><ClinicPatientHistoryPage /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/roles" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["roles", "permissions"]}><ClinicRoles /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/chat" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["chat", "chats"]}><OrganizationChatPage /></RequireOrganizationAccess>} />
+            <Route path="/clinic-dashboard/media" element={<RequireOrganizationAccess allowedGuards={["clinic"]}><OrganizationMediaPage /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/reviews" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["reviews"]}><ClinicReviews /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/announcements" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["announcements"]}><ClinicAnnouncements /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/notifications" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["notifications"]}><ClinicNotifications /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/users" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["users"]}><ClinicUsers /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/services" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["services"]}><ClinicServices /></RequireOrganizationAccess>} />
+            <Route path="/clinic-dashboard/drugs" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["drugs"]}><ClinicDrugs /></RequireOrganizationAccess>} />
+            <Route path="/clinic-dashboard/questionnaires" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["questionnaires"]}><ClinicQuestionnaires /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/inventory" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["inventory"]}><ClinicInventory /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/settings" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["settings"]}><ClinicSettings /></RequireOrganizationAccess>} />
             <Route path="/clinic-dashboard/modules" element={<RequireOrganizationAccess allowedGuards={["clinic"]} permissionPrefixes={["modules"]}><ClinicModules /></RequireOrganizationAccess>} />
@@ -218,11 +232,13 @@ const App = () => (
             <Route path="/lab-dashboard/patients" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["patients"]}><LabPatients /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/patients/:id/history" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["patients"]}><LabPatientHistoryPage /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/chat" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["chat", "chats"]}><OrganizationChatPage /></RequireOrganizationAccess>} />
+            <Route path="/lab-dashboard/media" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]}><OrganizationMediaPage /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/notifications" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["notifications"]}><LabNotifications /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/roles" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["roles", "permissions"]}><LabRoles /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/users" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["users"]}><LabUsers /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/service-categories" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["service-categories"]}><LabServiceCategories /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/services" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["services"]}><LabServices /></RequireOrganizationAccess>} />
+            <Route path="/lab-dashboard/questionnaires" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["questionnaires"]}><LabQuestionnaires /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/medical-analyses" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["medical-analyses"]}><LabMedicalAnalyses /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/financial" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["financial"]}><LabFinancial /></RequireOrganizationAccess>} />
             <Route path="/lab-dashboard/today-medical-analyses" element={<RequireOrganizationAccess allowedGuards={["medical_laboratory"]} permissionPrefixes={["medical-analyses"]}><LabTodayMedicalAnalyses /></RequireOrganizationAccess>} />
@@ -233,10 +249,12 @@ const App = () => (
             <Route path="/radiology-dashboard" element={<RadiologyDashboard />} />
             <Route path="/radiology-dashboard/rays" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["rays"]}><RadiologyRays /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/ray-categories" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["ray-categories"]}><RadiologyRayCategories /></RequireOrganizationAccess>} />
+            <Route path="/radiology-dashboard/questionnaires" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["questionnaires"]}><RadiologyQuestionnaires /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/users" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["users"]}><RadiologyUsers /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/patients" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["patients"]}><RadiologyPatients /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/patients/:id/history" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["patients"]}><RadiologyPatientHistoryPage /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/chat" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["chat", "chats"]}><OrganizationChatPage /></RequireOrganizationAccess>} />
+            <Route path="/radiology-dashboard/media" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]}><OrganizationMediaPage /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/notifications" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["notifications"]}><RadiologyNotifications /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/roles" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["roles", "permissions"]}><RadiologyRoles /></RequireOrganizationAccess>} />
             <Route path="/radiology-dashboard/financial" element={<RequireOrganizationAccess allowedGuards={["radiology_center"]} permissionPrefixes={["financial"]}><RadiologyFinancial /></RequireOrganizationAccess>} />

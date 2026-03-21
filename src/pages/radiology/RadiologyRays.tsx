@@ -17,9 +17,17 @@ type RayRow = {
   reservation_id?: number | null;
   date?: string;
   payment?: "paid" | "not_paid";
-  cost?: string | null;
+  remaining?: number;
+  paid_amount?: number;
   report?: string | null;
   images?: string[];
+  payment_history?: Array<{ date?: string; amount?: number; remaining?: number; payment_way?: string | null }>;
+};
+
+type PaymentRow = {
+  date: string;
+  amount: string;
+  payment_way: "cash";
 };
 
 type PatientOption = {
@@ -37,9 +45,8 @@ export default function RadiologyRays() {
     patient_id: "",
     reservation_id: "",
     date: "",
-    payment: "not_paid" as "paid" | "not_paid",
-    cost: "",
     report: "",
+    payments: [] as PaymentRow[],
     images: [] as File[],
     existing_images: [] as string[],
   });
@@ -129,9 +136,8 @@ export default function RadiologyRays() {
       patient_id: "",
       reservation_id: "",
       date: "",
-      payment: "not_paid",
-      cost: "",
       report: "",
+      payments: [],
       images: [],
       existing_images: [],
     });
@@ -148,9 +154,12 @@ export default function RadiologyRays() {
         patient_id: ray.patient_id ? String(ray.patient_id) : "",
         reservation_id: ray.reservation_id ? String(ray.reservation_id) : "",
         date: ray.date ?? "",
-        payment: ray.payment ?? "not_paid",
-        cost: ray.cost ?? "",
         report: ray.report ?? "",
+        payments: (ray.payment_history ?? []).map((p) => ({
+          date: p.date ?? "",
+          amount: String(p.amount ?? 0),
+          payment_way: "cash",
+        })),
         images: [],
         existing_images: Array.isArray(ray.images) ? ray.images : [],
       });
@@ -175,9 +184,12 @@ export default function RadiologyRays() {
         patient_id: ray.patient_id ? String(ray.patient_id) : "",
         reservation_id: ray.reservation_id ? String(ray.reservation_id) : "",
         date: ray.date ?? "",
-        payment: ray.payment ?? "not_paid",
-        cost: ray.cost ?? "",
         report: ray.report ?? "",
+        payments: (ray.payment_history ?? []).map((p) => ({
+          date: p.date ?? "",
+          amount: String(p.amount ?? 0),
+          payment_way: "cash",
+        })),
         images: [],
         existing_images: Array.isArray(ray.images) ? ray.images : [],
       });
@@ -232,19 +244,20 @@ export default function RadiologyRays() {
                 <th className="text-start font-medium p-4 text-muted-foreground">Patient</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">Date</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">Payment</th>
-                <th className="text-start font-medium p-4 text-muted-foreground">Cost</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">Paid</th>
+                <th className="text-start font-medium p-4 text-muted-foreground">Remaining</th>
                 <th className="text-start font-medium p-4 text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {isLoading && (
-                <tr><td className="p-4 text-muted-foreground" colSpan={6}>Loading rays...</td></tr>
+                <tr><td className="p-4 text-muted-foreground" colSpan={7}>Loading rays...</td></tr>
               )}
               {error && (
-                <tr><td className="p-4 text-destructive" colSpan={6}>{error instanceof Error ? error.message : "Failed to load rays"}</td></tr>
+                <tr><td className="p-4 text-destructive" colSpan={7}>{error instanceof Error ? error.message : "Failed to load rays"}</td></tr>
               )}
               {!isLoading && !error && rays.length === 0 && (
-                <tr><td className="p-4 text-muted-foreground" colSpan={6}>No rays found.</td></tr>
+                <tr><td className="p-4 text-muted-foreground" colSpan={7}>No rays found.</td></tr>
               )}
               {!isLoading && !error && rays.map((r) => (
                 <tr key={String(r.id)} className="hover:bg-muted/30 transition-colors">
@@ -254,7 +267,8 @@ export default function RadiologyRays() {
                   <td className="p-4">
                     <Badge variant={r.payment === "paid" ? "default" : "secondary"}>{r.payment ?? "not_paid"}</Badge>
                   </td>
-                  <td className="p-4 text-muted-foreground">{r.cost ?? "—"}</td>
+                  <td className="p-4 text-muted-foreground">{r.paid_amount ?? 0}</td>
+                  <td className="p-4 text-muted-foreground">{r.remaining ?? 0}</td>
                   <td className="p-4">
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="gap-2" onClick={() => openShow(r)}>
@@ -322,32 +336,66 @@ export default function RadiologyRays() {
                 <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} disabled={dialogMode === "show"} />
               </div>
             </div>
-            <div className="grid sm:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Reservation ID (optional)</Label>
                 <Input value={form.reservation_id} onChange={(e) => setForm((f) => ({ ...f, reservation_id: e.target.value }))} disabled={dialogMode === "show"} />
-              </div>
-              <div className="space-y-2">
-                <Label>Payment</Label>
-                <select
-                  title="Payment"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={form.payment}
-                  onChange={(e) => setForm((f) => ({ ...f, payment: e.target.value as "paid" | "not_paid" }))}
-                  disabled={dialogMode === "show"}
-                >
-                  <option value="not_paid">not_paid</option>
-                  <option value="paid">paid</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Cost (optional)</Label>
-                <Input type="number" min="0" value={form.cost} onChange={(e) => setForm((f) => ({ ...f, cost: e.target.value }))} disabled={dialogMode === "show"} />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Report</Label>
               <Textarea rows={3} value={form.report} onChange={(e) => setForm((f) => ({ ...f, report: e.target.value }))} disabled={dialogMode === "show"} />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Payment History</Label>
+                {dialogMode !== "show" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setForm((f) => ({ ...f, payments: [...f.payments, { date: f.date || "", amount: "", payment_way: "cash" }] }))}
+                  >
+                    Add Payment
+                  </Button>
+                )}
+              </div>
+              {form.payments.length === 0 && <p className="text-sm text-muted-foreground">No payments.</p>}
+              {form.payments.map((row, index) => (
+                <div key={`payment-${index}`} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2">
+                  <div className="col-span-12 md:col-span-3">
+                    <Label className="text-xs">Date</Label>
+                    <Input type="date" value={row.date} onChange={(e) => setForm((f) => ({ ...f, payments: f.payments.map((p, i) => (i === index ? { ...p, date: e.target.value } : p)) }))} disabled={dialogMode === "show"} />
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <Label className="text-xs">Amount</Label>
+                    <Input type="number" min="0" value={row.amount} onChange={(e) => setForm((f) => ({ ...f, payments: f.payments.map((p, i) => (i === index ? { ...p, amount: e.target.value } : p)) }))} disabled={dialogMode === "show"} />
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <Label className="text-xs">Remaining</Label>
+                    <Input type="number" value={row.amount || "0"} readOnly disabled />
+                  </div>
+                  <div className="col-span-10 md:col-span-2">
+                    <Label className="text-xs">Way</Label>
+                    <select
+                      title="Payment way"
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                      value={row.payment_way}
+                      onChange={(e) => setForm((f) => ({ ...f, payments: f.payments.map((p, i) => (i === index ? { ...p, payment_way: e.target.value as "cash" } : p)) }))}
+                      disabled={dialogMode === "show"}
+                    >
+                      <option value="cash">cash</option>
+                    </select>
+                  </div>
+                  {dialogMode !== "show" && (
+                    <div className="col-span-2 md:col-span-1">
+                      <Button type="button" size="icon" variant="ghost" onClick={() => setForm((f) => ({ ...f, payments: f.payments.filter((_, i) => i !== index) }))}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
             <div className="space-y-2">
               <Label>Images</Label>
@@ -398,18 +446,28 @@ function toRayFormData(form: {
   patient_id: string;
   reservation_id: string;
   date: string;
-  payment: "paid" | "not_paid";
-  cost: string;
   report: string;
+  payments: PaymentRow[];
   images: File[];
 }): FormData {
   const fd = new FormData();
   fd.append("patient_id", form.patient_id);
   if (form.reservation_id.trim()) fd.append("reservation_id", form.reservation_id.trim());
   fd.append("date", form.date);
-  fd.append("payment", form.payment);
-  if (form.cost.trim()) fd.append("cost", form.cost.trim());
   fd.append("report", form.report.trim());
+  fd.append(
+    "payments",
+    JSON.stringify(
+      form.payments
+        .filter((row) => row.date && row.amount !== "")
+        .map((row) => ({
+          date: row.date,
+          amount: Number(row.amount || 0),
+          remaining: Number(row.amount || 0),
+          payment_way: row.payment_way || undefined,
+        })),
+    ),
+  );
   form.images.forEach((file) => fd.append("images[]", file));
   return fd;
 }
