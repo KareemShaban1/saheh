@@ -17,7 +17,7 @@ use App\Http\Controllers\Api\Patient\QuestionnaireController;
 use App\Http\Controllers\Api\Patient\PrescriptionController;
 use App\Http\Controllers\Api\Patient\RadiologyCenterController;
 use App\Http\Controllers\Api\Patient\RayController;
-use App\Http\Controllers\FrontApis\clinic\ReservationController;
+use App\Http\Controllers\Api\Patient\ReservationController as PatientReservationController;
 use App\Http\Controllers\Api\Patient\ReviewsController;
 use App\Http\Controllers\Api\Patient\ReelController;
 use App\Models\Clinic;
@@ -271,10 +271,10 @@ Route::prefix('patient')->group(function () {
         Route::post('delete-profile', [PatientAuthController::class, 'deleteProfile']);
         Route::get('profile', [PatientAuthController::class, 'getProfile']);
 
-        Route::get('reservations', [ReservationController::class, 'index']);
-        Route::get('reservation/{id}', [ReservationController::class, 'show']);
-        Route::post('store_reservation', [ReservationController::class, 'store']);
-        Route::post('change_reservation_status/{id}/{status}', [ReservationController::class, 'changeReservationStatus']);
+        Route::get('reservations', [PatientReservationController::class, 'index']);
+        Route::get('reservation/{id}', [PatientReservationController::class, 'show']);
+        Route::post('store_reservation', [PatientReservationController::class, 'store']);
+        Route::post('change_reservation_status/{id}/{status}', [PatientReservationController::class, 'changeReservationStatus']);
 
         Route::get('clinics', [ClinicController::class, 'index']);
         Route::get('clinic/{id}', [ClinicController::class, 'show']);

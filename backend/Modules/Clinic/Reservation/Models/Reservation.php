@@ -6,6 +6,7 @@ use App\Models\MedicalAnalysis;
 use Modules\Clinic\GlassesDistance\Models\GlassesDistance;
 use App\Models\Ray;
 use App\Models\Payment;
+use App\Models\PrescriptionDrug;
 use Modules\Clinic\Prescription\Models\Prescription;
 use App\Models\Clinic;
 use App\Models\ModuleService;
@@ -125,13 +126,37 @@ class Reservation extends Model implements HasMedia
         );
     }
 
-    public function drugs()
+    public function prescriptionDrugs()
     {
-        return $this->hasMany(
-            \Modules\Clinic\Prescription\Models\Drug::class,
+        return $this->hasManyThrough(
+            PrescriptionDrug::class,
+            Prescription::class,
             'reservation_id',
+            'prescription_id',
+            'id',
             'id',
         );
+    }
+
+    public function getDrugsAttribute()
+    {
+        return $this->prescriptionDrugs()
+            ->with(['drug' => function ($query) {
+                $query->select(['id', 'name', 'clinic_id', 'doctor_id']);
+            }])
+            ->get()
+            ->map(function (PrescriptionDrug $item) {
+                return [
+                    'id' => $item->drug_id,
+                    'name' => $item->drug?->name,
+                    'dose' => $item->dose,
+                    'type' => $item->type,
+                    'frequency' => $item->frequency,
+                    'period' => $item->period,
+                    'notes' => $item->notes,
+                ];
+            })
+            ->values();
     }
 
     public function clinic()
