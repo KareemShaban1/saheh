@@ -78,6 +78,13 @@ The app uses **standard Web Push** (VAPID + service worker). After login, **clin
    - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (e.g. `mailto:you@example.com`)
    - `FRONTEND_URL` — public URL of the React app (used to build links in notifications).
 4. Deploy over **HTTPS** (required for push except on `localhost`).
+5. After editing `.env` on the server, run **`php artisan config:clear`** (or avoid stale `config:cache`).
+
+**VAPID troubleshooting** (`Private key should be 32 bytes long when decoded`)
+
+- Keys must be the **Base64Url** pair from `npx web-push generate-vapid-keys` (one continuous string each). **Do not** paste PEM blocks or swap public/private.
+- Put each key on **one line** in `.env`. Avoid wrapping the value in **extra** quotes; if you use quotes, ensure the key itself has no spaces or line breaks inside.
+- If keys were edited with standard Base64 (`+` / `/`), the backend normalizes to Base64Url when possible—if it still fails, **regenerate** keys and update both backend `.env` and the frontend subscription flow (users may need to re-enable notifications after a key change).
 
 **API** (prefix `api/v1`): `GET /push/vapid-public-key` (public); authenticated `POST` … `/organization/push/subscribe`, `/admin/push/subscribe`, `/patient/push/subscribe` (body = browser `subscription.toJSON()` shape).
 

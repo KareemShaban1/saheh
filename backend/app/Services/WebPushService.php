@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PushSubscription;
+use Base64Url\Base64Url;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Minishlink\WebPush\Subscription;
@@ -53,13 +54,30 @@ class WebPushService
             return;
         }
 
-        $webPush = new WebPush([
-            'VAPID' => [
-                'subject' => config('webpush.subject'),
-                'publicKey' => config('webpush.public_key'),
-                'privateKey' => config('webpush.private_key'),
-            ],
-        ]);
+        try {
+            $webPush = new WebPush([
+                'VAPID' => [
+                    'subject' => config('webpush.subject'),
+                    'publicKey' => config('webpush.public_key'),
+                    'privateKey' => config('webpush.private_key'),
+                ],
+            ]);
+        } catch (\ErrorException $e) {
+            if (str_contains($e->getMessage(), '[VAPID]')) {
+                $pub = (string) config('webpush.public_key');
+                $priv = (string) config('webpush.private_key');
+                Log::error('webpush_invalid_vapid', [
+                    'message' => $e->getMessage(),
+                    'decoded_public_bytes' => self::vapidDecodedLength($pub),
+                    'decoded_private_bytes' => self::vapidDecodedLength($priv),
+                    'hint' => 'Regenerate with: npx web-push generate-vapid-keys. Expect public→65 bytes, private→32 bytes decoded. Do not swap keys; one line per .env value (no extra quotes). Run: php artisan config:clear',
+                ]);
+
+                return;
+            }
+
+            throw $e;
+        }
 
         foreach ($subs as $sub) {
             try {
@@ -94,6 +112,22 @@ class WebPushService
                 'subscription_id' => $sub->id,
                 'reason' => $report->getReason(),
             ]);
+        }
+    }
+
+    /**
+     * @return int|null Byte length after Base64Url decode, or null if empty/invalid.
+     */
+    private static function vapidDecodedLength(string $key): ?int
+    {
+        if ($key === '') {
+            return null;
+        }
+
+        try {
+            return strlen(Base64Url::decode($key));
+        } catch (\Throwable) {
+            return null;
         }
     }
 
