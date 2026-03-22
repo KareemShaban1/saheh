@@ -4,6 +4,7 @@ import { Stethoscope, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { InstallPwaButton } from "@/components/PwaInstallPrompt";
 
 const navLinks = [
   { key: "nav.home", to: "/" },
@@ -46,6 +47,7 @@ export default function PublicLayout() {
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
+            <InstallPwaButton />
             <Button
               variant="outline"
               size="sm"
@@ -87,7 +89,10 @@ export default function PublicLayout() {
                 {t(link.key)}
               </Link>
             ))}
-            <div className="pt-2 flex gap-2">
+            <div className="pt-2">
+              <InstallPwaButton className="w-full mb-2" />
+            </div>
+            <div className="pt-0 flex gap-2">
               <Button
                 variant="outline"
                 size="sm"

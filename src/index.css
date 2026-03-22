@@ -123,6 +123,24 @@
   }
 }
 
+@layer components {
+  /* First-paint PWA splash (index.html) — uses Tailwind theme tokens */
+  .pwa-splash {
+    @apply fixed inset-0 z-[2147483647] flex items-center justify-center bg-background transition-opacity duration-300 ease-out;
+  }
+
+  .pwa-splash__logo {
+    @apply rounded-3xl shadow-lg;
+    box-shadow:
+      0 12px 40px hsl(172 66% 40% / 0.22),
+      var(--shadow-lg);
+  }
+
+  .pwa-splash.pwa-splash--hide {
+    @apply opacity-0 pointer-events-none;
+  }
+}
+
 @layer utilities {
   .gradient-primary {
     background: var(--gradient-primary);

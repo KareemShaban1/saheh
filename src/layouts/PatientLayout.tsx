@@ -14,10 +14,13 @@ import {
   LogOut,
   Home,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { InstallPwaButton } from "@/components/PwaInstallPrompt";
+import { PatientNotificationsBell } from "@/components/PatientNotificationsBell";
+import { syncWebPushSubscription } from "@/lib/webPush";
 
 const sidebarItems = [
   { key: "nav.home", to: "/patient/home", icon: Home },
@@ -48,8 +51,15 @@ export default function PatientLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { dir, t, lang, toggleLanguage } = useLanguage();
-  const { logout } = useAuth();
+  const { logout, token, isAuthenticated } = useAuth();
   const isReelsRoute = location.pathname === "/patient/reels";
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+    void syncWebPushSubscription("patient", token).catch(() => {
+      /* optional */
+    });
+  }, [isAuthenticated, token]);
 
   const handleLogout = () => {
     logout();
@@ -92,7 +102,10 @@ export default function PatientLayout() {
               );
             })}
           </nav>
-          <div className="p-3 border-t space-y-1">
+          <div className="p-3 border-t space-y-2">
+            {!collapsed ? (
+              <InstallPwaButton className="w-full justify-center" />
+            ) : null}
             <Link to="/" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted">
               <Home className="h-4 w-4 shrink-0" />
               {!collapsed && <span>{t("nav.backToHome")}</span>}
@@ -109,6 +122,7 @@ export default function PatientLayout() {
           </button>
           <h1 className="text-lg font-semibold">{t("patient.title")}</h1>
           <div className="ml-auto flex items-center gap-2">
+            {token ? <PatientNotificationsBell token={token} /> : null}
             <button
               className="px-2 py-1 rounded-lg text-xs text-muted-foreground hover:bg-muted"
               onClick={toggleLanguage}

@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { InstallPwaButton } from "@/components/PwaInstallPrompt";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -133,6 +134,21 @@ export function DashboardLayout({ title, titleKey, basePath, items }: DashboardL
       mounted = false;
     };
   }, [canLogout, isSuperAdminArea]);
+
+  useEffect(() => {
+    if (!canLogout) return;
+    void (async () => {
+      try {
+        if (isSuperAdminArea && superAdminToken) {
+          await syncWebPushSubscription("admin", superAdminToken);
+        } else if (!isSuperAdminArea && orgToken) {
+          await syncWebPushSubscription("organization", orgToken);
+        }
+      } catch {
+        /* permission denied, VAPID not configured, or unsupported browser */
+      }
+    })();
+  }, [canLogout, isSuperAdminArea, superAdminToken, orgToken]);
 
   useEffect(() => {
     setProfileForm({
@@ -398,6 +414,7 @@ export function DashboardLayout({ title, titleKey, basePath, items }: DashboardL
           <h1 className="text-lg font-semibold">{displayTitle}</h1>
 	</div>
           <div className="flex items-center gap-2">
+            <InstallPwaButton />
             <Button variant="outline" size="sm" className="text-xs" onClick={toggleLanguage}>
               {lang === "en" ? t("lang.ar") : t("lang.en")}
             </Button>

@@ -1,3 +1,8 @@
+/**
+ * Tailwind CSS v3 — used across the app with PostCSS (`postcss.config.js`).
+ * Globals & design tokens: `src/index.css` (`@tailwind base|components|utilities`).
+ * Regenerate IDE IntelliSense if needed: ensure `content` paths cover all templates.
+ */
 import type { Config } from "tailwindcss";
 
 export default {
@@ -109,5 +114,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 } satisfies Config;

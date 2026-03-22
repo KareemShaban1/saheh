@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { publicApi } from "@/lib/api";
+import { PwaInstallCard } from "@/components/PwaInstallPrompt";
 
 type HomeOrg = {
   id?: number | string;
@@ -307,6 +308,8 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      <PwaInstallCard />
 
       {/* CTA */}
       <section className="container pb-20">

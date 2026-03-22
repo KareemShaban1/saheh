@@ -33,7 +33,7 @@ export type QuestionnaireInput = {
 	questions: QuestionnaireQuestionInput[];
 };
 
-async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+export async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
 	const { method = "GET", body, headers = {}, token } = options;
 	const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
@@ -183,6 +183,12 @@ export const patientApi = {
 	deleteReview: (token: string, id: string) =>
 		request(`/patient/reviews/${id}`, { method: "DELETE", token }),
 	home: (token: string) => request("/patient/home", { token }),
+	notifications: (token: string, params?: Record<string, string>) => {
+		const q = params ? "?" + new URLSearchParams(params).toString() : "";
+		return request(`/patient/notifications${q}`, { token });
+	},
+	markNotificationRead: (token: string, id: string) =>
+		request(`/patient/notifications/${id}/read`, { method: "POST", token }),
 	chatContacts: (token: string) => request("/patient/chat/contacts", { token }),
 	chatConversations: (token: string) => request("/patient/chat/conversations", { token }),
 	openChatConversation: (token: string, data: { target_type: "user"; target_id: number }) =>
@@ -436,6 +442,11 @@ export function setSuperAdminUser(user: unknown): void {
 
 export function clearSuperAdminUser(): void {
 	if (typeof window !== "undefined") localStorage.removeItem(SUPER_ADMIN_USER_KEY);
+}
+
+/** Patient SPA auth token (same key as `AuthContext`). */
+export function getPatientToken(): string | null {
+	return typeof window !== "undefined" ? localStorage.getItem("patient_token") : null;
 }
 
 export const superAdminAuthApi = {

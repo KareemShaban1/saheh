@@ -192,7 +192,23 @@ In site rewrite config:
 location / {
     try_files $uri $uri/ /index.html;
 }
+
+# Important: do not long-cache the app shell or service worker, or deploys look “stuck”
+location = /index.html {
+    add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+}
+location = /sw.js {
+    add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+}
+location = /registerSW.js {
+    add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+}
+location = /manifest.webmanifest {
+    add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+}
 ```
+
+Hashed files under `/assets/` can stay cached long-term (Vite adds new filenames each build).
 
 ---
 
@@ -289,6 +305,36 @@ Then restart services:
     ```
 - Wrong API URL:
   - Rebuild frontend after changing `VITE_BASE_URL`.
+
+### Changes not visible after `git pull` + build (very common)
+
+1. **Confirm you built and serve the same folder**
+   - Frontend: run `npm run build` from the **repo root** (where `vite.config.ts` is), not inside `backend/`.
+   - Nginx (or aaPanel) **site root** must be the **`dist/`** folder that build just updated (e.g. `/www/wwwroot/clinic-saas/dist`).
+   - If the panel points at another path or an old copy, you will always see old files.
+
+2. **PWA / Service Worker cache (often the real cause)**
+   - This app registers a service worker that caches JS/CSS. Browsers can keep serving **old** bundles until the worker updates.
+   - **Test in a private window** or another browser.
+   - Or DevTools → **Application** → **Service Workers** → **Unregister**, then hard refresh (`Ctrl+Shift+R`).
+   - On your phone: clear site data for the app domain or reinstall the PWA.
+
+3. **Laravel still serving old config/routes**
+   - After backend changes:
+     ```bash
+     cd /path/to/clinic-saas/backend
+     php artisan optimize:clear
+     php artisan config:cache
+     php artisan route:cache
+     php artisan view:cache
+     ```
+   - Restart **PHP-FPM** (aaPanel) so **OPcache** reloads PHP files.
+
+4. **Reverse proxy / CDN**
+   - If you use Cloudflare or Nginx `proxy_cache`, **purge cache** for the app (and API) host.
+
+5. **Verify the server actually has new files**
+   - `grep` or `stat` a string you know you added in `dist/assets/index-*.js` or check `git log -1` on the server in the clone directory.
 
 ---
 

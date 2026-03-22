@@ -2,15 +2,37 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d9488" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Saheh" />
+    <!-- Skip splash on repeat loads in this tab (set when app first dismisses splash) -->
+    <style>
+      html.saheh-splash-off #pwa-splash {
+        display: none !important;
+      }
+    </style>
+    <script>
+      try {
+        if (sessionStorage.getItem("saheh_skip_splash")) {
+          document.documentElement.classList.add("saheh-splash-off");
+        }
+      } catch (e) {}
+    </script>
+    <link rel="preload" as="image" href="/pwa-192.png" fetchpriority="high" />
+    <link rel="icon" type="image/svg+xml" href="/pwa-icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192.png" />
+    <link rel="apple-touch-icon" href="/pwa-192.png" />
+    <!-- iOS splash (fallback; Android uses manifest theme/background + icons) -->
+    <link rel="apple-touch-startup-image" href="/pwa-splash.png" media="(orientation: portrait)" />
     <title>Saheh</title>
-    <meta name="description" content="Saheh" />
+    <meta name="description" content="Saheh — healthcare platform for clinics, labs, radiology & patients" />
     <meta name="author" content="Saheh" />
 
-    <!-- TODO: Update og:title to match your application name -->
     <meta property="og:title" content="Saheh" />
-    <meta property="og:description" content="Saheh" />
+    <meta property="og:description" content="Saheh — healthcare platform" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
@@ -20,6 +42,18 @@
   </head>
 
   <body>
+    <!-- Brief splash while app bundle loads (styled via Tailwind in src/index.css) -->
+    <div id="pwa-splash" class="pwa-splash" role="status" aria-live="polite" aria-label="Loading">
+      <img
+        src="/pwa-192.png"
+        width="120"
+        height="120"
+        alt=""
+        class="pwa-splash__logo"
+        fetchpriority="high"
+        decoding="async"
+      />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
