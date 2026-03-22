@@ -35,17 +35,33 @@ self.addEventListener("push", (event: PushEvent) => {
   }
 
   const title = data.title || "Saheh";
+  // `silent: false` — request default OS sound where the browser allows it (often still no custom sound).
+  // `vibrate` is ignored on most desktop browsers; Android PWAs usually honor it.
   const options: NotificationOptions = {
     body: data.body || "",
     icon: "/pwa-192.png",
     badge: "/pwa-192.png",
-    vibrate: [200, 100, 200, 100, 200],
+    vibrate: [300, 120, 300, 120, 300, 120, 500],
     tag: data.tag || "saheh-default",
     renotify: true,
+    silent: false,
     data: { url: data.url || "/" },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(title, options);
+      // Nudge open tabs (app in foreground): vibration works in more contexts from a window than from SW on desktop.
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const c of clients) {
+        const w = c as WindowClient & { visibilityState?: string };
+        if (w.visibilityState === "visible") {
+          w.postMessage({ type: "SAHEH_PUSH_RECEIVED" });
+          break;
+        }
+      }
+    })(),
+  );
 });
 
 self.addEventListener("notificationclick", (event: NotificationEvent) => {

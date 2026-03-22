@@ -1,4 +1,34 @@
-const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:8000/api/v1";
+/**
+ * Laravel API base (no trailing slash). Used by all `request()` calls.
+ *
+ * Resolution order:
+ * 1. `<meta name="app-api-base" content="https://api.example.com/api/v1" />` in index.html (server override, no rebuild)
+ * 2. `VITE_BASE_URL` from `.env` at **build** time
+ * 3. Production fallback: same browser origin + `/api/v1` (works when Nginx proxies `/api` to Laravel on the same host)
+ * 4. Dev fallback: `http://localhost:8000/api/v1`
+ *
+ * If the API lives on another subdomain (e.g. api.domain.com), set `VITE_BASE_URL` before `npm run build`
+ * or add the meta tag on the server.
+ */
+export function getApiBaseUrl(): string {
+	if (typeof document !== "undefined") {
+		const meta = document.querySelector('meta[name="app-api-base"]')?.getAttribute("content")?.trim();
+		if (meta) {
+			return meta.replace(/\/$/, "");
+		}
+	}
+	const env = import.meta.env.VITE_BASE_URL as string | undefined;
+	const trimmed = typeof env === "string" ? env.trim() : "";
+	if (trimmed.length > 0) {
+		return trimmed.replace(/\/$/, "");
+	}
+	if (import.meta.env.PROD && typeof window !== "undefined") {
+		return `${window.location.origin.replace(/\/$/, "")}/api/v1`;
+	}
+	return "http://localhost:8000/api/v1";
+}
+
+const BASE_URL = getApiBaseUrl();
 
 interface RequestOptions {
 	method?: string;

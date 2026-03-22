@@ -25,6 +25,7 @@ import {
 	List,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useNewUnreadNotificationPing } from "@/hooks/useNewUnreadNotificationPing";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -279,7 +280,7 @@ export function DashboardLayout({ title, titleKey, basePath, items }: DashboardL
           ? "/radiology-dashboard/notifications"
           : "/dashboard-login";
 
-  const { data: notificationsData } = useQuery({
+  const { data: notificationsData, isFetched: notificationsFeedFetched } = useQuery({
     queryKey: ["topbar", "notifications", basePath],
     queryFn: () => {
       if (notificationScope === "clinic") return clinicApi.notifications({ per_page: "10" });
@@ -290,6 +291,19 @@ export function DashboardLayout({ title, titleKey, basePath, items }: DashboardL
     enabled: notificationsEnabled,
     refetchInterval: 10000,
   });
+
+  const orgUnreadIdsKey = useMemo(() => {
+    const rows = (((notificationsData as { data?: { data?: Array<Record<string, unknown>> } })?.data?.data) ??
+      []) as Array<Record<string, unknown>>;
+    return rows
+      .filter((item) => !Boolean(item.is_read ?? item.read_at))
+      .map((item) => String(item.id ?? ""))
+      .filter(Boolean)
+      .sort()
+      .join(",");
+  }, [notificationsData]);
+
+  useNewUnreadNotificationPing(orgUnreadIdsKey, notificationsEnabled, notificationsEnabled && notificationsFeedFetched);
 
   const topBarNotifications = (((notificationsData as { data?: { data?: Array<Record<string, unknown>> } })?.data?.data) ?? [])
     .map((item) => ({

@@ -135,6 +135,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <ServiceWorkerClientBridge />
           {/* <GlobalLoadingIndicator /> */}
           <Routes>
             {/* Auth (no layout) */}

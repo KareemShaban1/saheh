@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +11,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useNewUnreadNotificationPing } from "@/hooks/useNewUnreadNotificationPing";
 import { patientApi } from "@/lib/api";
 
 type NotificationRow = {
@@ -32,14 +34,24 @@ export function PatientNotificationsBell({ token }: { token: string }) {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 
-	const { data: raw } = useQuery({
+	const { data: raw, isFetched } = useQuery({
 		queryKey: ["patient", "notifications", "topbar"],
 		queryFn: () => patientApi.notifications(token, { per_page: "15" }),
 		enabled: !!token,
 		refetchInterval: 15000,
 	});
 
-	const rows = unwrapPatientNotifications(raw);
+	const rows = useMemo(() => unwrapPatientNotifications(raw), [raw]);
+
+	const patientUnreadIdsKey = useMemo(() => {
+		return rows
+			.filter((r) => !(r.is_read ?? r.isRead ?? r.read_at))
+			.map((r) => String(r.id))
+			.sort()
+			.join(",");
+	}, [rows]);
+
+	useNewUnreadNotificationPing(patientUnreadIdsKey, Boolean(token), isFetched);
 	const mapped = rows.map((item) => ({
 		id: String(item.id),
 		title: String(item.title ?? "Notification"),

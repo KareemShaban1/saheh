@@ -88,6 +88,18 @@ The app uses **standard Web Push** (VAPID + service worker). After login, **clin
 
 **API** (prefix `api/v1`): `GET /push/vapid-public-key` (public); authenticated `POST` … `/organization/push/subscribe`, `/admin/push/subscribe`, `/patient/push/subscribe` (body = browser `subscription.toJSON()` shape).
 
+**Production: bell updates work but no push / no `/push/vapid-public-key` in Laravel logs**
+
+- The SPA must call the **real** API host. Set **`VITE_BASE_URL`** in the project root `.env` **before** `npm run build` (e.g. `https://api.yourdomain.com/api/v1`), or uncomment and set **`<meta name="app-api-base" ...>`** in `index.html` on the server so you don’t need a rebuild.
+- If `VITE_BASE_URL` is missing, older builds pointed at `http://localhost:8000/api/v1` — the browser never hits your server, so push never registers and you only see **in-app** (database) notifications.
+- Same-origin deploy: if Nginx serves the app at `https://app.example.com` and proxies **`/api`** to Laravel, the built app can use the default **`https://app.example.com/api/v1`** fallback (no `VITE_BASE_URL` needed).
+
+**Sound & vibration**
+
+- **Push (background):** `src/sw.ts` uses `showNotification` with `vibrate` and `silent: false`. Many **desktop** browsers still **ignore** vibration for notifications; **sound** is almost always the **OS default** (and can be muted per-site in system settings).
+- **While the app is open:** the service worker **posts a message** to visible tabs so the page can run **`navigator.vibrate`** + a short **Web Audio** beep (`src/lib/notificationFeedback.ts`). The **patient** and **org dashboard** bells also **beep/vibrate** when polling sees **new unread** IDs (so you get feedback even if push UI is quiet).
+- **First visit:** some browsers block audio until the user has **interacted** with the page (click/tap); vibration may still work on supported phones.
+
 **Try it (patient push + in-app list)**
 
 1. Log in as a **patient** in the PWA, allow notifications, open the **bell** in the patient header (loads `GET /patient/notifications`).

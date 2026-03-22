@@ -305,6 +305,42 @@ Then restart services:
     ```
 - Wrong API URL:
   - Rebuild frontend after changing `VITE_BASE_URL`.
+- **Web Push / `GET /push/vapid-public-key` never appears in Laravel access logs**
+  - The production bundle must not still target `localhost:8000`. Set root `.env` before build: `VITE_BASE_URL=https://api.yourdomain.com/api/v1`, then `npm run build`.
+  - Or serve the SPA with `<meta name="app-api-base" content="https://api.yourdomain.com/api/v1" />` in `index.html` (see commented example in repo `index.html`) — no rebuild required.
+  - **Single domain** (app + API under one host): proxy `/api/` to Laravel’s `public/index.php` so `https://yourdomain.com/api/v1/...` works; the SPA then uses the built-in production fallback `origin + /api/v1` when `VITE_BASE_URL` is unset.
+  - After fixing the URL, open DevTools → **Network**, log in as patient, and confirm `push/vapid-public-key` returns **200** with `configured: true`.
+  - Easiest production split remains **`api.` subdomain** → Laravel `public/` + **`VITE_BASE_URL=https://api.yourdomain.com/api/v1`** at build time.
+
+### Example: one domain (`app` + `/api` on same host, aaPanel-style)
+
+Site `root` = frontend `dist/`. Laravel lives in `backend/public`. Use a **prefix** location that **wins over regex** locations and always hits `index.php`:
+
+```nginx
+# API (Laravel) — ^~ stops nginx from trying regex locations (e.g. *.php) first
+location ^~ /api {
+    include fastcgi_params;
+    fastcgi_pass unix:/tmp/php-cgi-82.sock;   # match your PHP version socket in aaPanel
+
+    # Absolute paths avoid wrong DOCUMENT_ROOT when server root is dist/
+    fastcgi_param SCRIPT_FILENAME /www/wwwroot/saheh.kareemsoft.org/backend/public/index.php;
+    fastcgi_param DOCUMENT_ROOT /www/wwwroot/saheh.kareemsoft.org/backend/public;
+    fastcgi_param SCRIPT_NAME /index.php;
+
+    # Full original URI so Laravel sees /api/v1/...
+    fastcgi_param REQUEST_URI $request_uri;
+    fastcgi_param QUERY_STRING $query_string;
+    fastcgi_hide_header X-Powered-By;
+}
+```
+
+Adjust `SCRIPT_FILENAME` / `DOCUMENT_ROOT` if your deploy path differs. Root `.env` before `npm run build`:
+
+```env
+VITE_BASE_URL=https://saheh.kareemsoft.org/api/v1
+```
+
+Quick checks from the server: `curl -sI "https://saheh.kareemsoft.org/api/v1/push/vapid-public-key"` should return **200** and JSON (or **404** only if routes/cache are wrong).
 
 ### Changes not visible after `git pull` + build (very common)
 
