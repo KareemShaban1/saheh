@@ -118,6 +118,7 @@ import RadiologyRegisterPage from "@/pages/auth/RadiologyRegisterPage";
 import PlaceholderPage from "@/components/PlaceholderPage";
 import NotFound from "@/pages/NotFound";
 import GlobalLoadingIndicator from "@/components/GlobalLoadingIndicator";
+import { ServiceWorkerClientBridge } from "@/components/ServiceWorkerClientBridge";
 
 import { FileText, FlaskConical, ScanLine, Heart, Glasses, Star, CalendarDays, Users, Shield, Trash2, Hash, Clock, MapPin, Bell } from "lucide-react";
 import { QUERY_CACHE_DEFAULTS } from "@/lib/queryCache";
