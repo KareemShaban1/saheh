@@ -53,10 +53,18 @@ class AppointmentApprovedNotification extends Notification
     {
         $reservation = $this->reservation;
 
+        $title = __('Appointment approved');
+        $body = __('Your appointment on :date has been approved.', ['date' => (string) ($reservation->date ?? '')]);
+
         return [
-            'body' => " تم قبول الحجز بنجاح بتاريخ {$reservation->date}",
+            'title' => $title,
+            'message' => $body,
+            'body' => $body,
+            'module' => 'reservations',
+            'event' => 'appointment_approved',
             'icon' => 'fas fa-file',
-            'url' => url('/patient/dashboard'),
+            'url' => '/patient/appointments',
+            'action_url' => '/patient/appointments',
         ];
     }
 

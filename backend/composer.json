@@ -21,6 +21,7 @@
         "livewire/livewire": "^2.5",
         "macsidigital/laravel-zoom": "^7.0",
         "mcamara/laravel-localization": "*",
+        "minishlink/web-push": "^9.0",
         "milon/barcode": "^10.0",
         "munafio/chatify": "^1.5",
         "opcodesio/log-viewer": "^2.5",

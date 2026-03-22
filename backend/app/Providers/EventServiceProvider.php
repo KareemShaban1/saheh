@@ -8,7 +8,9 @@ use App\Events\PatientRegistration;
 use App\Listeners\PatientRegistrationNotification;
 use App\Listeners\SendMakeAppointmentNotification;
 use App\Listeners\SendNotificationToPatient;
+use App\Listeners\SendWebPushOnDatabaseNotification;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
@@ -32,7 +34,10 @@ class EventServiceProvider extends ServiceProvider
         ],
         PatientMakeAppointment::class=>[
             SendMakeAppointmentNotification::class
-        ]
+        ],
+        NotificationSent::class => [
+            SendWebPushOnDatabaseNotification::class,
+        ],
     ];
 
     /**

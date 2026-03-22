@@ -35,6 +35,11 @@ class EnsureOrganizationApiPermission
             return $next($request);
         }
 
+        // Lookup tables (not module-scoped in RBAC seed): allow any authenticated org user.
+        if ($this->isUnrestrictedLookupRoute($request, $resource)) {
+            return $next($request);
+        }
+
         $action = $this->resolveAction($request->method());
         $candidates = $this->buildCandidatePermissions($resource, $action);
 
@@ -56,6 +61,19 @@ class EnsureOrganizationApiPermission
         }
 
         return strtolower((string) ($parts[3] ?? 'dashboard'));
+    }
+
+    /**
+     * Routes that are read-only reference data and are not tied to seeded module permissions
+     * (e.g. clinic/specialties vs doctors.*).
+     */
+    private function isUnrestrictedLookupRoute(Request $request, string $resource): bool
+    {
+        if (strtoupper($request->method()) !== 'GET') {
+            return false;
+        }
+
+        return in_array($resource, ['specialties'], true);
     }
 
     private function resolveAction(string $method): string

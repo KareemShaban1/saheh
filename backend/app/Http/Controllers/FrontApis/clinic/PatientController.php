@@ -5,14 +5,20 @@ namespace App\Http\Controllers\FrontApis\clinic;
 use Illuminate\Http\Request;
 use App\Models\Shared\Patient;
 use Modules\Clinic\Reservation\Models\Reservation;
-use App\Models\Shared\Prescription;
-use App\Models\Shared\Drug;
-use App\Models\Shared\GlassesDistance;
-use App\Models\Shared\ReservationTooth;
-use App\Models\Shared\ToothRecord;
+use Modules\Clinic\Prescription\Models\Prescription;
+use Modules\Clinic\GlassesDistance\Models\GlassesDistance;
+use Modules\Clinic\ChronicDisease\Models\ChronicDisease;
+use App\Models\ToothRecord;
+use App\Models\ReservationTooth;
 use App\Models\Shared\Clinic;
+use App\Models\PrescriptionDrug;
+use App\Models\MedicalAnalysis;
+use App\Models\Ray;
+use App\Models\Payment;
+use App\Models\ModuleService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use App\Http\Controllers\BaseFrontApiController;
 class PatientController extends BaseFrontApiController
 {
@@ -137,16 +143,57 @@ class PatientController extends BaseFrontApiController
 
         $reservationIds = $reservations->pluck('id')->values();
 
-        $prescriptions = Prescription::query()
-            ->whereIn('reservation_id', $reservationIds)
-            ->get()
-            ->keyBy('reservation_id');
-
-        $drugsByReservation = Drug::query()
+        $prescriptionsByReservation = Prescription::query()
             ->whereIn('reservation_id', $reservationIds)
             ->orderBy('id')
             ->get()
             ->groupBy('reservation_id');
+
+        $allPrescriptionIds = $prescriptionsByReservation->flatten()->pluck('id')->values();
+
+        $prescriptionDrugsByPrescription = PrescriptionDrug::query()
+            ->whereIn('prescription_id', $allPrescriptionIds)
+            ->with(['drug' => fn ($q) => $q->select('id', 'name')])
+            ->orderBy('id')
+            ->get()
+            ->groupBy('prescription_id');
+
+        $chronicByReservation = ChronicDisease::query()
+            ->whereIn('reservation_id', $reservationIds)
+            ->where('clinic_id', $clinicId)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('reservation_id');
+
+        $analysesByReservation = MedicalAnalysis::withoutGlobalScopes()
+            ->whereIn('reservation_id', $reservationIds)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('reservation_id');
+
+        $raysByReservation = Ray::withoutGlobalScopes()
+            ->whereIn('reservation_id', $reservationIds)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('reservation_id');
+
+        $paymentsByReservation = Payment::query()
+            ->where('payable_type', Reservation::class)
+            ->whereIn('payable_id', $reservationIds)
+            ->orderByDesc('payment_date')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('payable_id');
+
+        $servicesByReservation = ModuleService::query()
+            ->where('module_type', Reservation::class)
+            ->whereIn('module_id', $reservationIds)
+            ->with(['service' => fn ($q) => $q->withoutGlobalScopes()->select('id', 'service_name', 'price')])
+            ->orderBy('id')
+            ->get()
+            ->groupBy('module_id');
 
         $glassesByReservation = GlassesDistance::query()
             ->where('clinic_id', $clinicId)
@@ -200,38 +247,120 @@ class PatientController extends BaseFrontApiController
             ])
             ->values();
 
-        $reservationHistory = $reservations->map(function ($reservation) use ($prescriptions, $drugsByReservation, $glassesByReservation, $teethByReservation) {
-            $prescription = $prescriptions->get($reservation->id);
+        $reservationHistory = $reservations->map(function ($reservation) use (
+            $prescriptionsByReservation,
+            $prescriptionDrugsByPrescription,
+            $chronicByReservation,
+            $analysesByReservation,
+            $raysByReservation,
+            $paymentsByReservation,
+            $servicesByReservation,
+            $glassesByReservation,
+            $teethByReservation
+        ) {
+            $rxList = $prescriptionsByReservation->get($reservation->id, collect());
+            $prescriptionsPayload = $rxList
+                ->map(function ($prescription) use ($prescriptionDrugsByPrescription) {
+                    $rows = $prescriptionDrugsByPrescription->get($prescription->id, collect());
+
+                    return [
+                        'id' => $prescription->id,
+                        'title' => $prescription->title,
+                        'notes' => $prescription->notes,
+                        'images' => $prescription->images ?? [],
+                        'drugs' => $rows
+                            ->map(fn ($row) => [
+                                'id' => $row->id,
+                                'drug_id' => $row->drug_id,
+                                'name' => $row->drug?->name,
+                                'type' => $row->type,
+                                'dose' => $row->dose,
+                                'frequency' => $row->frequency,
+                                'period' => $row->period,
+                                'notes' => $row->notes,
+                            ])
+                            ->values(),
+                    ];
+                })
+                ->values();
+            $firstPrescription = $prescriptionsPayload->first();
+
             $glasses = $glassesByReservation->get($reservation->id, collect());
             $teethRows = $teethByReservation->get($reservation->id, collect());
+            $chronicRows = $chronicByReservation->get($reservation->id, collect());
+            $analysisRows = $analysesByReservation->get($reservation->id, collect());
+            $rayRows = $raysByReservation->get($reservation->id, collect());
+            $paymentRows = $paymentsByReservation->get($reservation->id, collect());
+            $serviceRows = $servicesByReservation->get($reservation->id, collect());
 
             return [
                 'id' => $reservation->id,
+                'type' => $reservation->type,
+                'parent_id' => $reservation->parent_id,
                 'date' => $reservation->date,
-                'time' => $reservation->time,
+                'time' => $reservation->time ?? null,
                 'slot' => $reservation->slot,
+                'month' => $reservation->month,
                 'reservation_number' => $reservation->reservation_number,
+                'first_diagnosis' => $reservation->first_diagnosis,
+                'final_diagnosis' => $reservation->final_diagnosis,
+                'cost' => $reservation->cost,
                 'status' => $reservation->status,
                 'acceptance' => $reservation->acceptance,
                 'payment' => $reservation->payment,
+                'attachments' => $reservation->images ?? [],
                 'doctor_name' => $reservation->doctor?->user?->name ?? null,
-                'prescription' => $prescription ? [
-                    'id' => $prescription->id,
-                    'title' => $prescription->title,
-                    'notes' => $prescription->notes,
-                    'images' => $prescription->images ?? [],
-                    'drugs' => ($drugsByReservation->get($reservation->id, collect()))
-                        ->map(fn ($drug) => [
-                            'id' => $drug->id,
-                            'name' => $drug->name,
-                            'type' => $drug->type,
-                            'dose' => $drug->dose,
-                            'frequency' => $drug->frequency,
-                            'period' => $drug->period,
-                            'notes' => $drug->notes,
-                        ])
-                        ->values(),
-                ] : null,
+                'prescriptions' => $prescriptionsPayload,
+                'prescription' => $firstPrescription,
+                'chronic_diseases' => $chronicRows
+                    ->map(fn ($c) => [
+                        'id' => $c->id,
+                        'name' => $c->name,
+                        'measure' => $c->measure,
+                        'date' => $c->date,
+                        'notes' => $c->notes,
+                    ])
+                    ->values(),
+                'medical_analyses' => $analysisRows
+                    ->map(fn ($a) => [
+                        'id' => $a->id,
+                        'date' => $a->date,
+                        'report' => $a->report,
+                        'payment' => $a->payment,
+                        'cost' => $a->cost,
+                        'doctor_name' => $a->doctor_name,
+                        'images' => $a->images ?? [],
+                    ])
+                    ->values(),
+                'rays' => $rayRows
+                    ->map(fn ($r) => [
+                        'id' => $r->id,
+                        'date' => $r->date,
+                        'report' => $r->report,
+                        'payment' => $r->payment,
+                        'cost' => $r->cost,
+                        'images' => $r->images ?? [],
+                    ])
+                    ->values(),
+                'payments' => $paymentRows
+                    ->map(fn ($pay) => [
+                        'id' => $pay->id,
+                        'payment_date' => optional($pay->payment_date)->format('Y-m-d H:i'),
+                        'amount' => $pay->amount,
+                        'remaining' => $pay->remaining,
+                        'payment_way' => $pay->payment_way,
+                    ])
+                    ->values(),
+                'services' => $serviceRows
+                    ->map(fn ($ms) => [
+                        'id' => $ms->id,
+                        'fee' => $ms->fee,
+                        'notes' => $ms->notes,
+                        'service_name' => $ms->service?->service_name,
+                        'service_price' => $ms->service?->price,
+                        'images' => $ms->images ?? [],
+                    ])
+                    ->values(),
                 'glasses_distances' => $glasses
                     ->map(fn ($g) => [
                         'id' => $g->id,
@@ -269,11 +398,14 @@ class PatientController extends BaseFrontApiController
                 'id' => $patient->id,
                 'name' => $patient->name,
                 'phone' => $patient->phone,
+                'whatsapp_number' => $patient->whatsapp_number ?? null,
                 'email' => $patient->email,
                 'address' => $patient->address,
                 'age' => $patient->age,
                 'gender' => $patient->gender,
                 'blood_group' => $patient->blood_group,
+                'height' => $patient->height ?? null,
+                'weight' => $patient->weight ?? null,
             ],
             'reservations' => $reservationHistory,
             'patient_level_glasses_distances' => $patientLevelGlasses,

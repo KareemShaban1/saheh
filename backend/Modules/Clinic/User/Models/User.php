@@ -16,6 +16,8 @@ use Modules\Clinic\User\Models\UserDoctor;
 use App\Models\Clinic;
 use App\Models\MedicalLaboratory;
 use App\Models\RadiologyCenter;
+use App\Models\PushSubscription;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class User extends Authenticatable
 {
@@ -141,5 +143,10 @@ class User extends Authenticatable
     public function userDoctors()
     {
         return $this->hasMany(UserDoctor::class);
+    }
+
+    public function pushSubscriptions(): MorphMany
+    {
+        return $this->morphMany(PushSubscription::class, 'subscribable');
     }
 }

@@ -27,7 +27,7 @@ use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 use App\Notifications\MakeAppointmentNotification;
-
+use App\Notifications\ReservationAcceptanceNotification;
 
 class ReservationController extends BaseFrontApiController
 {
@@ -421,6 +421,8 @@ class ReservationController extends BaseFrontApiController
             (int) $reservation->id,
         );
 
+        $previousAcceptance = (string) ($reservation->acceptance ?? 'pending');
+
         $reservation->update([
             'patient_id' => $validated['patient_id'],
             'doctor_id' => $validated['doctor_id'],
@@ -466,6 +468,18 @@ class ReservationController extends BaseFrontApiController
         if ($request->hasFile('voice_records')) {
             foreach ($request->file('voice_records') as $voiceFile) {
                 $reservation->addMedia($voiceFile)->toMediaCollection('reservation_voice_records');
+            }
+        }
+
+        $newAcceptance = (string) $validated['acceptance'];
+        if (
+            $previousAcceptance !== $newAcceptance
+            && in_array($newAcceptance, ['approved', 'not_approved'], true)
+        ) {
+            $reservation->refresh()->load(['clinic', 'doctor.user']);
+            $patient = Patient::find((int) $validated['patient_id']);
+            if ($patient) {
+                $patient->notify(new ReservationAcceptanceNotification($reservation, $newAcceptance));
             }
         }
 

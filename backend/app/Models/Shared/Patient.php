@@ -27,6 +27,8 @@ use App\Models\MedicalLaboratory;
 use App\Models\RadiologyCenter;
 use Modules\Clinic\Doctor\Models\Doctor;
 use App\Models\Shared\PatientReview;
+use App\Models\PushSubscription;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Patient extends Authenticatable
 {
@@ -258,6 +260,11 @@ class Patient extends Authenticatable
     public function clinicReview(){
 
         $this->hasOne(PatientReview::class ,'patient_id');
+    }
+
+    public function pushSubscriptions(): MorphMany
+    {
+        return $this->morphMany(PushSubscription::class, 'subscribable');
     }
 
 }

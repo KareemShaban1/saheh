@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Patient\DoctorController;
 use App\Http\Controllers\Api\Patient\GlassesDistanceController;
 use App\Http\Controllers\Api\Patient\HomeController;
 use App\Http\Controllers\Api\Patient\MedicalAnalysisController;
+use App\Http\Controllers\Api\Patient\PatientNotificationController;
 use App\Http\Controllers\Api\Patient\MedicalLaboratoryController;
 use App\Http\Controllers\Api\Patient\PatientChatApiController;
 use App\Http\Controllers\Api\Patient\MessageController;
@@ -31,6 +32,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Clinic\Doctor\Models\Doctor;
 use Modules\Clinic\Reservation\Models\Reservation;
 use App\Models\OrganizationMedia;
+use App\Http\Controllers\FrontApis\PushSubscriptionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -270,6 +272,8 @@ Route::prefix('patient')->group(function () {
         Route::post('change-password', [PatientAuthController::class, 'changePassword']);
         Route::post('delete-profile', [PatientAuthController::class, 'deleteProfile']);
         Route::get('profile', [PatientAuthController::class, 'getProfile']);
+        Route::post('push/subscribe', [PushSubscriptionController::class, 'subscribePatient']);
+        Route::post('push/unsubscribe', [PushSubscriptionController::class, 'unsubscribePatient']);
 
         Route::get('reservations', [PatientReservationController::class, 'index']);
         Route::get('reservation/{id}', [PatientReservationController::class, 'show']);
@@ -327,6 +331,8 @@ Route::prefix('patient')->group(function () {
         Route::post('questionnaires/{id}/answers', [QuestionnaireController::class, 'submitAnswers']);
 
         Route::get('home', [HomeController::class, 'index']);
+        Route::get('notifications', [PatientNotificationController::class, 'index']);
+        Route::post('notifications/{id}/read', [PatientNotificationController::class, 'markAsRead']);
         Route::get('reels', [ReelController::class, 'feed']);
         Route::post('reels/{id}/toggle-like', [ReelController::class, 'toggleLike']);
         Route::post('reels/{id}/toggle-save', [ReelController::class, 'toggleSave']);

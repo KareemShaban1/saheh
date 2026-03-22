@@ -15,6 +15,9 @@ use App\Http\Controllers\FrontApis\clinic\RolePermissionController;
 use App\Http\Controllers\FrontApis\clinic\ServiceController;
 use App\Http\Controllers\FrontApis\organization\QuestionnaireController;
 use App\Http\Controllers\FrontApis\organization\OrganizationMediaController;
+use App\Http\Controllers\FrontApis\PushSubscriptionController;
+
+Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey']);
 
 // Organization (Clinic / Lab / Radiology) login & register – no auth
 Route::post('clinic/login', [OrganizationAuthApiController::class, 'clinicLogin']);
@@ -47,6 +50,8 @@ Route::middleware('auth:admin_api')->prefix('admin')->group(function () {
     Route::post('/logout', [AdminAuthApiController::class, 'logout']);
     Route::get('/profile', [AdminAuthApiController::class, 'profile']);
     Route::put('/profile', [AdminAuthApiController::class, 'updateProfile']);
+    Route::post('/push/subscribe', [PushSubscriptionController::class, 'subscribeAdmin']);
+    Route::post('/push/unsubscribe', [PushSubscriptionController::class, 'unsubscribeAdmin']);
 });
 
 // Front APIs: Dashboard pages (JSON for React frontend) – token or session
